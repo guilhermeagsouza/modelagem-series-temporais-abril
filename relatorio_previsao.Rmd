@@ -1,0 +1,1443 @@
+---
+title: ""
+author: ""
+date: ""
+output: html_document
+---
+
+### 0. Introdução
+
+Neste relatório estão gráficos que visam entender o comportamento semanal de cada revista através do número de sessões, dados esses obtidos pela ferramenta Google Analytics. À princípio seriam analisados oito sites, porém Você S/A teve de ficar de fora por não ter histórico de dados suficiente. Os períodos de cada site costumam variar, alguns começando em Janeiro/2015 e outros em Jan/2017.
+
+Serão analisados os seguintes sites:
+
+* Boa Forma
+* Capricho
+* Guia do Estudante
+* Quatro Rodas
+* Saúde
+* Superinteressante
+* Veja
+* Claudia (com parceiros)
+
+Cada site contém os seguintes tópicos:
+
+1. Gráfico da série temporal com a curva basal e os pontos influentes (outliers).
+2. Gráfico de decomposição série temporal para identificar tendência e sazonalidade.
+3. Gráfico de Quebra estrutural, caso a série temporal apresente ponto de ruptura.
+4. Gráfico com a série temporal e quatro resultados de previsão para 30 semanas.
+
+```{r, echo=FALSE}
+
+knitr::opts_chunk$set(
+  message=F,
+  warning=F,
+  echo=F,
+  fig.width=10, 
+  fig.height=8
+)
+```
+
+
+```{r}
+library(anomalize)
+library(plotly)
+library(strucchange)
+library(tidyverse)
+```
+
+
+```{r}
+source("chart/prep_data/fun_prep_df_point.R", encoding = 'UTF-8')
+source("chart/prep_data/fun_basal.R", encoding = 'UTF-8')
+source("chart/prep_data/fun_prep_df_month.R", encoding = 'UTF-8')
+source("chart/prep_data/fun_prep_df_ma.R", encoding = 'UTF-8')
+source("chart/prep_data/fun_prep_df_loess.R", encoding = 'UTF-8')
+source("chart/fun_plot_ts.R", encoding = 'UTF-8')
+source("chart/prep_data/fun_calc_coord_polygon.R", encoding = 'UTF-8')
+source("chart/fun_plot_col.R", encoding = "UTF-8")
+source("chart/prep_data/fun_break_point.R", encoding = "UTF-8")
+```
+
+
+### 1. Site Boa Forma
+
+#### 1.1 Gráfico Série Temporal
+
+```{r}
+readr::read_rds("dados_p_graficos/base_boaforma.Rda") %>% 
+  fun_plot_ts()
+```
+
+
+### 1.2 Gráfico Decomposição temporal
+
+```{r}
+decomposicao_temporal_boaforma <- readr::read_rds("decomposicao_temporal/decomposicao_temporal_boaforma.Rda")
+
+g1 <- plotly::plot_ly(
+  data = decomposicao_temporal_boaforma,
+  x = ~data, 
+  y = ~Sessions,
+  name = 'Sessões',
+  type = 'scatter', 
+  mode = 'lines',
+  text = ~paste('Ano semana: ',isoYearIsoWeek)
+) %>% 
+  plotly::layout(
+    legend = list(orientation = "h",   #mostrar entradas horizontalmente
+                  xanchor = "center",  #usar centralizado
+                  x = 0.5), #coloca a legenda no centro do eixo-x
+     yaxis = list(title = '', range = c(0, 1.5*10^6))
+  )
+
+g2 <- plotly::plot_ly(
+  data = decomposicao_temporal_boaforma,
+  x = ~data, 
+  y = ~Tendencia, 
+  name = 'Tendência',
+  type = 'scatter', 
+  mode = 'lines',
+  text = ~paste('Ano semana: ',isoYearIsoWeek)
+) %>% 
+  plotly::layout(
+  )
+
+g3 <- plotly::plot_ly(
+  data = decomposicao_temporal_boaforma,
+  x = ~data, 
+  y = ~Sazonalidade, 
+  name = 'Sazonalidade',
+  type = 'scatter', 
+  mode = 'lines',
+  text = ~paste('Ano semana: ',isoYearIsoWeek)
+)
+
+g4 <- plotly::plot_ly(
+  data = decomposicao_temporal_boaforma,
+  x = ~data, 
+  y = ~Aleatorio, 
+  name = 'Aleatório',
+  type = 'scatter', 
+  mode = 'lines',
+  text = ~paste('Ano semana: ',isoYearIsoWeek)
+)
+
+plotly::subplot(g1, g2, g3, g4, nrows = 4)
+```
+
+### 1.3 Gráfico Quebra estrutural
+```{r}
+base_boaforma <- readr::read_rds("dados_p_graficos/base_boaforma.Rda")
+df_boaforma <- readxl::read_xlsx(
+  "dados_site/sites_consolidados_2015.01.01_2020.09.19.xlsx")
+
+ano_semana <- df_boaforma %>% 
+  dplyr::mutate(isoYearIsoWeek = as.numeric(isoYearIsoWeek)) %>% 
+  dplyr::filter(dia_da_semana == "seg") %>% 
+  group_by(isoYearIsoWeek) %>% 
+  summarise(data = dplyr::first(date))
+
+ts_boaforma <- stats::ts(data = base_boaforma$y, 
+          frequency = 365.25/7,
+          start = c(2017,01)
+)
+
+base_boaforma %>% 
+  dplyr::left_join(
+    ano_semana %>% dplyr::rename(x = data),
+    by = c("x")
+  ) %>% 
+  dplyr::mutate(break_point = fun_break_point(ts_boaforma)) %>% 
+  #Criação do gráfico
+  plotly::plot_ly(
+  x = ~x, 
+  y = ~y, 
+  type = 'scatter', 
+  mode = 'lines',
+  color = ~break_point,
+  text = ~paste('Ano semana: ',isoYearIsoWeek),
+  showlegend = FALSE
+) %>% 
+  #Layout
+  plotly::layout(
+    #title = "Decomposição temporal da série de Sessões do site Boa Forma",
+    legend = list(
+      
+      orientation = "h",   #mostrar entradas horizontalmente
+      xanchor = "center",  #usar centralizado
+      x = 0.5), #coloca a legenda no centro do eixo-x
+    
+    xaxis = list(title = ''),
+    yaxis = list(title = 'Sessões', range = c(0,~y))
+    )
+```
+
+### 1.4 Gráfico com os resultados de previsão
+```{r}
+metrica_ets_prophet_boaforma <- 
+  readr::read_rds(
+    "metricas-previsao-sessoes-sites/metricas_previsao_boaforma.Rda")
+
+metrica_sarima_boaforma <- readr::read_rds(
+  "metricas-previsao-sessoes-sites/metricas_previsao_sarima_boaforma.Rda") %>% 
+  dplyr::select(mape) %>% 
+  as.numeric() %>% 
+  round(digits = 3)*100
+
+################################################################################
+
+
+readr::read_rds("previsao-sessoes-sites/tbl_previsao_boaforma.Rda") %>% 
+  plotly::plot_ly(
+    
+    x = ~.index,
+    y = ~ACTUAL,
+    type = 'scatter', 
+    mode = 'lines',
+    name = 'Série',
+    text = ~paste('Ano semana: ',isoYearIsoWeek)
+    
+  ) %>% 
+  plotly::add_trace(
+    
+    x = ~.index,
+    y = ~PROPHET,
+    type = 'scatter', 
+    mode = 'lines',
+    name = str_c('Prophet - MAPE: ',round(metrica_ets_prophet_boaforma[2,5]$mape,1),"%"),
+    text = ~paste('Ano semana: ',isoYearIsoWeek)
+    
+  ) %>% 
+  plotly::add_trace(
+    x = ~.index,
+    y = ~`ETS(M,N,A)`,
+    type = 'scatter', 
+    mode = 'lines',
+    name = str_c('ETS - MAPE: ',round(metrica_ets_prophet_boaforma[1,5]$mape,1), "%"),
+    text = ~paste('Ano semana: ',isoYearIsoWeek)
+  ) %>% 
+    plotly::add_trace(
+    x = ~.index,
+    y = ~SARIMA,
+    type = 'scatter', 
+    mode = 'lines',
+    name = str_c('SARIMA - MAPE: ',metrica_sarima_boaforma),
+    text = ~paste('Ano semana: ',isoYearIsoWeek)
+  ) %>% 
+  
+  plotly::layout(
+    legend = list(orientation = "h",   #mostrar entradas horizontalmente
+                  xanchor = "center",  #usar centralizado
+                  x = 0.5), #coloca a legenda no centro do eixo-x
+    xaxis = list(title = ''),
+    yaxis = list(title = '')
+  )
+```
+
+
+
+#### 2. Site Capricho
+
+### 2.1 Gráfico Série Temporal
+
+```{r}
+readr::read_rds("dados_p_graficos/base_capricho.Rda") %>% 
+  fun_plot_ts()
+```
+
+### 2.2 Gráfico Decomposição Temporal
+
+```{r}
+decomposicao_temporal_claudia <- readr::read_rds("decomposicao_temporal/decomposicao_temporal_capricho.Rda")
+
+g1 <- plotly::plot_ly(
+  data = decomposicao_temporal_claudia,
+  x = ~data, 
+  y = ~Sessions,
+  name = 'Sessões',
+  type = 'scatter', 
+  mode = 'lines',
+  text = ~paste('Ano semana: ',isoYearIsoWeek)
+) %>% 
+  plotly::layout(
+    #title = "Decomposição temporal da série de Sessões do site claudia",
+    legend = list(orientation = "h",   #mostrar entradas horizontalmente
+                  xanchor = "center",  #usar centralizado
+                  x = 0.5) #coloca a legenda no centro do eixo-x
+  )
+
+g2 <- plotly::plot_ly(
+  data = decomposicao_temporal_claudia,
+  x = ~data, 
+  y = ~Tendencia, 
+  name = 'Tendência',
+  type = 'scatter', 
+  mode = 'lines',
+  text = ~paste('Ano semana: ',isoYearIsoWeek)
+)
+
+g3 <- plotly::plot_ly(
+  data = decomposicao_temporal_claudia,
+  x = ~data, 
+  y = ~Sazonalidade, 
+  name = 'Sazonalidade',
+  type = 'scatter', 
+  mode = 'lines',
+  text = ~paste('Ano semana: ',isoYearIsoWeek)
+)
+
+g4 <- plotly::plot_ly(
+  data = decomposicao_temporal_claudia,
+  x = ~data, 
+  y = ~Aleatorio, 
+  name = 'Aleatório',
+  type = 'scatter', 
+  mode = 'lines',
+  text = ~paste('Ano semana: ',isoYearIsoWeek)
+)
+
+plotly::subplot(g1, g2, g3, g4, nrows = 4)
+```
+
+#### 2.3 Gráfico da Quebra estrutural
+
+```{r}
+base_capricho <- readr::read_rds("dados_p_graficos/base_capricho.Rda")
+df_capricho <- readxl::read_xlsx(
+  "dados_site/sites_consolidados_2015.01.01_2020.09.19.xlsx")
+
+ano_semana <- df_capricho %>% 
+  dplyr::mutate(isoYearIsoWeek = as.numeric(isoYearIsoWeek)) %>% 
+  dplyr::filter(dia_da_semana == "seg") %>% 
+  group_by(isoYearIsoWeek) %>% 
+  summarise(data = dplyr::first(date))
+
+ts_capricho <- stats::ts(data = base_capricho$y, 
+          frequency = 365.25/7,
+          start = c(2015,01)
+)
+
+base_capricho %>% 
+  dplyr::left_join(
+    ano_semana %>% dplyr::rename(x = data),
+    by = c("x")
+  ) %>% 
+  dplyr::mutate(break_point = fun_break_point(ts_capricho)) %>% 
+  #Criação do gráfico
+  plotly::plot_ly(
+  x = ~x, 
+  y = ~y, 
+  type = 'scatter', 
+  mode = 'lines',
+  color = ~break_point,
+  text = ~paste('Ano semana: ',isoYearIsoWeek),
+  showlegend = FALSE
+) %>% 
+  #Layout
+  plotly::layout(
+    #title = "Decomposição temporal da série de Sessões do site Boa Forma",
+    legend = list(
+      
+      orientation = "h",   #mostrar entradas horizontalmente
+      xanchor = "center",  #usar centralizado
+      x = 0.5), #coloca a legenda no centro do eixo-x
+    
+    xaxis = list(title = ''),
+    yaxis = list(title = 'Sessões', range = c(0,~y))
+    )
+```
+
+
+### 2.4 Gráfico com os resultados de previsão para 30 semanas à frente
+```{r}
+metrica_ets_prophet_capricho <- 
+  readr::read_rds(
+    "metricas-previsao-sessoes-sites/metricas_previsao_capricho.Rda")
+
+metrica_sarima_capricho <- readr::read_rds(
+  "metricas-previsao-sessoes-sites/metricas_previsao_sarima_capricho.Rda") %>% 
+  dplyr::select(mape) %>% 
+  as.numeric() %>% 
+  round(digits = 3)*100
+
+################################################################################
+
+readr::read_rds("previsao-sessoes-sites/tbl_previsao_capricho.Rda") %>% 
+  plotly::plot_ly(
+    
+    x = ~.index,
+    y = ~ACTUAL,
+    type = 'scatter', 
+    mode = 'lines',
+    name = 'Série',
+    text = ~paste('Ano semana: ',isoYearIsoWeek)
+    
+  ) %>% 
+  plotly::add_trace(
+    
+    x = ~.index,
+    y = ~PROPHET,
+    type = 'scatter', 
+    mode = 'lines',
+    name = str_c('Prophet - MAPE: ',round(metrica_ets_prophet_capricho[2,5]$mape,1),"%"),
+    text = ~paste('Ano semana: ',isoYearIsoWeek)
+    
+  ) %>% 
+ plotly::add_trace(
+   x = ~.index,
+   y = ~`ETS(M,N,N)`,
+   type = 'scatter', 
+   mode = 'lines',
+   name = str_c('ETS - MAPE: ',round(metrica_ets_prophet_capricho[1,5]$mape,1),"%"),
+   text = ~paste('Ano semana: ',isoYearIsoWeek)
+ ) %>% 
+    plotly::add_trace(
+    x = ~.index,
+    y = ~SARIMA,
+    type = 'scatter', 
+    mode = 'lines',
+    name = str_c('SARIMA - MAPE: ',metrica_sarima_capricho,"%"),
+    text = ~paste('Ano semana: ',isoYearIsoWeek)
+  ) %>% 
+  plotly::layout(
+    legend = list(orientation = "h",   #mostrar entradas horizontalmente
+                  xanchor = "center",  #usar centralizado
+                  x = 0.5), #coloca a legenda no centro do eixo-x
+    xaxis = list(title = ''),
+    yaxis = list(title = '')
+  )
+```
+
+
+### 3. Site Guia do Estudante
+
+#### 3.1 Gráfico da Série Temporal
+```{r}
+readr::read_rds("dados_p_graficos/base_guiadoestudante.Rda") %>% 
+  fun_plot_ts()
+```
+
+
+#### 3.2 Gráfico Decomposição temporal
+```{r}
+decomposicao_temporal_guiadoestudante <- readr::read_rds("decomposicao_temporal/decomposicao_temporal_guiadoestudante.Rda")
+
+g1 <- plotly::plot_ly(
+  data = decomposicao_temporal_guiadoestudante,
+  x = ~data, 
+  y = ~Sessions,
+  name = 'Sessões',
+  type = 'scatter', 
+  mode = 'lines',
+  text = ~paste('Ano semana: ',isoYearIsoWeek)
+) %>% 
+  plotly::layout(
+    #title = "Decomposição temporal da série de Sessões do site Guia do Estudante",
+    legend = list(orientation = "h",   #mostrar entradas horizontalmente
+                  xanchor = "center",  #usar centralizado
+                  x = 0.5) #coloca a legenda no centro do eixo-x
+  )
+
+g2 <- plotly::plot_ly(
+  data = decomposicao_temporal_guiadoestudante,
+  x = ~data, 
+  y = ~Tendencia, 
+  name = 'Tendência',
+  type = 'scatter', 
+  mode = 'lines',
+  text = ~paste('Ano semana: ',isoYearIsoWeek)
+)
+
+g3 <- plotly::plot_ly(
+  data = decomposicao_temporal_guiadoestudante,
+  x = ~data, 
+  y = ~Sazonalidade, 
+  name = 'Sazonalidade',
+  type = 'scatter', 
+  mode = 'lines',
+  text = ~paste('Ano semana: ',isoYearIsoWeek)
+)
+
+g4 <- plotly::plot_ly(
+  data = decomposicao_temporal_guiadoestudante,
+  x = ~data, 
+  y = ~Aleatorio, 
+  name = 'Aleatório',
+  type = 'scatter', 
+  mode = 'lines',
+  text = ~paste('Ano semana: ',isoYearIsoWeek)
+)
+
+plotly::subplot(g1, g2, g3, g4, nrows = 4)
+```
+
+#### 3.3 Gráfico da Quebra estrutural
+
+```{r}
+base_guiadoestudante <- readr::read_rds("dados_p_graficos/base_guiadoestudante.Rda")
+df_guiadoestudante <- readxl::read_xlsx(
+  "dados_site/sites_consolidados_2015.01.01_2020.09.19.xlsx")
+
+ano_semana <- df_guiadoestudante %>% 
+  dplyr::mutate(isoYearIsoWeek = as.numeric(isoYearIsoWeek)) %>% 
+  dplyr::filter(dia_da_semana == "seg") %>% 
+  group_by(isoYearIsoWeek) %>% 
+  summarise(data = dplyr::first(date))
+
+ts_guiadoestudante <- stats::ts(data = base_guiadoestudante$y, 
+          frequency = 365.25/7,
+          start = c(2015,01)
+)
+
+base_guiadoestudante %>% 
+  dplyr::left_join(
+    ano_semana %>% dplyr::rename(x = data),
+    by = c("x")
+  ) %>% 
+  dplyr::mutate(break_point = fun_break_point(ts_guiadoestudante)) %>% 
+  #Criação do gráfico
+  plotly::plot_ly(
+  x = ~x, 
+  y = ~y, 
+  type = 'scatter', 
+  mode = 'lines',
+  color = ~break_point,
+  text = ~paste('Ano semana: ',isoYearIsoWeek),
+  showlegend = FALSE
+) %>% 
+  #Layout
+  plotly::layout(
+    legend = list(
+      
+      orientation = "h",   #mostrar entradas horizontalmente
+      xanchor = "center",  #usar centralizado
+      x = 0.5), #coloca a legenda no centro do eixo-x
+    
+    xaxis = list(title = ''),
+    yaxis = list(title = 'Sessões', range = c(0,~y))
+    )
+```
+
+#### 3.4 Gráfico com os resultados de previsão
+
+```{r}
+metrica_ets_prophet_guiadoestudante <- 
+  readr::read_rds(
+    "metricas-previsao-sessoes-sites/metricas_previsao_guiadoestudante.Rda")
+
+metrica_sarima_guiadoestudante <- readr::read_rds(
+  "metricas-previsao-sessoes-sites/metricas_previsao_sarima_guiadoestudante.Rda") %>% 
+  dplyr::select(mape) %>% 
+  as.numeric() %>% 
+  round(digits = 3)*100
+
+################################################################################
+
+readr::read_rds("previsao-sessoes-sites/tbl_previsao_guiadoestudante.Rda") %>% 
+  plotly::plot_ly(
+    
+    x = ~.index,
+    y = ~ACTUAL,
+    type = 'scatter', 
+    mode = 'lines',
+    name = 'Série',
+    text = ~paste('Ano semana: ',isoYearIsoWeek)
+    
+  ) %>% 
+  plotly::add_trace(
+    
+    x = ~.index,
+    y = ~PROPHET,
+    type = 'scatter', 
+    mode = 'lines',
+    name = str_c('Prophet - MAPE: ',round(metrica_ets_prophet_guiadoestudante[2,5]$mape,1),"%"),
+    text = ~paste('Ano semana: ',isoYearIsoWeek)
+    
+  ) %>% 
+  plotly::add_trace(
+    x = ~.index,
+    y = ~`ETS(M,AD,M)`,
+    type = 'scatter', 
+    mode = 'lines',
+    name = str_c('ETS - MAPE: ',round(metrica_ets_prophet_guiadoestudante[1,5]$mape,1),"%"),
+    text = ~paste('Ano semana: ',isoYearIsoWeek)
+  ) %>% 
+      plotly::add_trace(
+    x = ~.index,
+    y = ~SARIMA,
+    type = 'scatter', 
+    mode = 'lines',
+    name = str_c('SARIMA - MAPE: ',metrica_sarima_guiadoestudante,"%"),
+    text = ~paste('Ano semana: ',isoYearIsoWeek)
+  ) %>% 
+  plotly::layout(
+    legend = list(orientation = "h",   #mostrar entradas horizontalmente
+                  xanchor = "center",  #usar centralizado
+                  x = 0.5), #coloca a legenda no centro do eixo-x
+    xaxis = list(title = ''),
+    yaxis = list(title = '')
+  )
+```
+
+
+### 4. Site Quatro Rodas
+
+#### 4.1 Gráfico Série Temporal
+
+```{r}
+readr::read_rds("dados_p_graficos/base_quatrorodas.Rda") %>% 
+  fun_plot_ts()
+```
+
+#### 4.2 Gráfico Decomposição Temporal
+
+```{r}
+decomposicao_temporal_quatrorodas <- readr::read_rds("decomposicao_temporal/decomposicao_temporal_quatrorodas.Rda")
+
+g1 <- plotly::plot_ly(
+  data = decomposicao_temporal_quatrorodas,
+  x = ~data, 
+  y = ~Sessions,
+  name = 'Sessões',
+  type = 'scatter', 
+  mode = 'lines',
+  text = ~paste('Ano semana: ',isoYearIsoWeek)
+) %>% 
+  plotly::layout(
+    #title = "Decomposição temporal da série de Sessões do site Quatro Rodas",
+    legend = list(orientation = "h",   #mostrar entradas horizontalmente
+                  xanchor = "center",  #usar centralizado
+                  x = 0.5) #coloca a legenda no centro do eixo-x
+  )
+
+g2 <- plotly::plot_ly(
+  data = decomposicao_temporal_quatrorodas,
+  x = ~data, 
+  y = ~Tendencia, 
+  name = 'Tendência',
+  type = 'scatter', 
+  mode = 'lines',
+  text = ~paste('Ano semana: ',isoYearIsoWeek)
+)
+
+g3 <- plotly::plot_ly(
+  data = decomposicao_temporal_quatrorodas,
+  x = ~data, 
+  y = ~Sazonalidade, 
+  name = 'Sazonalidade',
+  type = 'scatter', 
+  mode = 'lines',
+  text = ~paste('Ano semana: ',isoYearIsoWeek)
+)
+
+g4 <- plotly::plot_ly(
+  data = decomposicao_temporal_quatrorodas,
+  x = ~data, 
+  y = ~Aleatorio, 
+  name = 'Aleatório',
+  type = 'scatter', 
+  mode = 'lines',
+  text = ~paste('Ano semana: ',isoYearIsoWeek)
+)
+
+plotly::subplot(g1, g2, g3, g4, nrows = 4)
+```
+
+#### 4.3 Gráfico da Quebra estrutural
+
+```{r}
+base_quatrorodas <- readr::read_rds("dados_p_graficos/base_quatrorodas.Rda")
+df_quatrorodas <- readxl::read_xlsx(
+  "dados_site/sites_consolidados_2015.01.01_2020.09.19.xlsx")
+
+ano_semana <- df_quatrorodas %>% 
+  dplyr::mutate(isoYearIsoWeek = as.numeric(isoYearIsoWeek)) %>% 
+  dplyr::filter(dia_da_semana == "seg") %>% 
+  group_by(isoYearIsoWeek) %>% 
+  summarise(data = dplyr::first(date))
+
+ts_quatrorodas <- stats::ts(data = base_quatrorodas$y, 
+          frequency = 365.25/7,
+          start = c(2015,01)
+)
+
+base_quatrorodas %>% 
+  dplyr::left_join(
+    ano_semana %>% dplyr::rename(x = data),
+    by = c("x")
+  ) %>% 
+  dplyr::mutate(break_point = fun_break_point(ts_quatrorodas)) %>% 
+  #Criação do gráfico
+  plotly::plot_ly(
+  x = ~x, 
+  y = ~y, 
+  type = 'scatter', 
+  mode = 'lines',
+  color = ~break_point,
+  text = ~paste('Ano semana: ',isoYearIsoWeek),
+  showlegend = FALSE
+) %>% 
+  #Layout
+  plotly::layout(
+    legend = list(
+      
+      orientation = "h",   #mostrar entradas horizontalmente
+      xanchor = "center",  #usar centralizado
+      x = 0.5), #coloca a legenda no centro do eixo-x
+    
+    xaxis = list(title = ''),
+    yaxis = list(title = 'Sessões', range = c(0,~y))
+    )
+```
+
+#### 4.4 Gráfico com os resultados de previsão
+
+```{r}
+metrica_ets_prophet_quatrorodas <- 
+  readr::read_rds(
+    "metricas-previsao-sessoes-sites/metricas_previsao_quatrorodas.Rda")
+
+metrica_sarima_quatrorodas <- readr::read_rds(
+  "metricas-previsao-sessoes-sites/metricas_previsao_sarima_quatrorodas.Rda") %>% 
+  dplyr::select(mape) %>% 
+  as.numeric() %>% 
+  round(digits = 3)*100
+
+################################################################################
+
+readr::read_rds("previsao-sessoes-sites/tbl_previsao_quatrorodas.Rda") %>% 
+  plotly::plot_ly(
+    
+    x = ~.index,
+    y = ~ACTUAL,
+    type = 'scatter', 
+    mode = 'lines',
+    name = 'Série',
+    text = ~paste('Ano semana: ',isoYearIsoWeek)
+    
+  ) %>% 
+  plotly::add_trace(
+    
+    x = ~.index,
+    y = ~PROPHET,
+    type = 'scatter', 
+    mode = 'lines',
+    name = str_c('Prophet - MAPE: ',round(metrica_ets_prophet_quatrorodas[2,5]$mape,1),"%"),
+    text = ~paste('Ano semana: ',isoYearIsoWeek)
+    
+  ) %>% 
+  plotly::add_trace(
+    x = ~.index,
+    y = ~`ETS(M,N,N)`,
+    type = 'scatter', 
+    mode = 'lines',
+    name = str_c('ETS - MAPE: ',round(metrica_ets_prophet_quatrorodas[1,5]$mape,1),"%"),
+    text = ~paste('Ano semana: ',isoYearIsoWeek)
+  ) %>% 
+      plotly::add_trace(
+    x = ~.index,
+    y = ~SARIMA,
+    type = 'scatter', 
+    mode = 'lines',
+    name = str_c('SARIMA - MAPE: ',metrica_sarima_quatrorodas,"%"),
+    text = ~paste('Ano semana: ',isoYearIsoWeek)
+  ) %>% 
+  plotly::layout(
+    legend = list(orientation = "h",   #mostrar entradas horizontalmente
+                  xanchor = "center",  #usar centralizado
+                  x = 0.5), #coloca a legenda no centro do eixo-x
+    xaxis = list(title = ''),
+    yaxis = list(title = '')
+  )
+```
+
+
+### 5. Site Saúde
+
+#### 5.1 Gráfico Série Temporal
+
+```{r}
+readr::read_rds("dados_p_graficos/base_saude.Rda") %>% 
+  fun_plot_ts()
+```
+
+#### 5.2 Gráfico Decomposição Temporal
+
+```{r}
+decomposicao_temporal_saude <- readr::read_rds("decomposicao_temporal/decomposicao_temporal_saude.Rda")
+
+g1 <- plotly::plot_ly(
+  data = decomposicao_temporal_saude,
+  x = ~data, 
+  y = ~Sessions,
+  name = 'Sessões',
+  type = 'scatter', 
+  mode = 'lines',
+  text = ~paste('Ano semana: ',isoYearIsoWeek)
+) %>% 
+  plotly::layout(
+    #title = "Decomposição temporal da série de Sessões do site Saúde",
+    legend = list(orientation = "h",   #mostrar entradas horizontalmente
+                  xanchor = "center",  #usar centralizado
+                  x = 0.5) #coloca a legenda no centro do eixo-x
+  )
+
+g2 <- plotly::plot_ly(
+  data = decomposicao_temporal_saude,
+  x = ~data, 
+  y = ~Tendencia, 
+  name = 'Tendência',
+  type = 'scatter', 
+  mode = 'lines',
+  text = ~paste('Ano semana: ',isoYearIsoWeek)
+)
+
+g3 <- plotly::plot_ly(
+  data = decomposicao_temporal_saude,
+  x = ~data, 
+  y = ~Sazonalidade, 
+  name = 'Sazonalidade',
+  type = 'scatter', 
+  mode = 'lines',
+  text = ~paste('Ano semana: ',isoYearIsoWeek)
+)
+
+g4 <- plotly::plot_ly(
+  data = decomposicao_temporal_saude,
+  x = ~data, 
+  y = ~Aleatorio, 
+  name = 'Aleatório',
+  type = 'scatter', 
+  mode = 'lines',
+  text = ~paste('Ano semana: ',isoYearIsoWeek)
+)
+
+plotly::subplot(g1, g2, g3, g4, nrows = 4)
+```
+
+#### 5.3 Gráfico da Quebra estrutural
+
+```{r}
+base_saude <- readr::read_rds("dados_p_graficos/base_saude.Rda")
+df_saude <- readxl::read_xlsx(
+  "dados_site/sites_consolidados_2015.01.01_2020.09.19.xlsx")
+
+ano_semana <- df_saude %>% 
+  dplyr::mutate(isoYearIsoWeek = as.numeric(isoYearIsoWeek)) %>% 
+  dplyr::filter(dia_da_semana == "seg") %>% 
+  group_by(isoYearIsoWeek) %>% 
+  summarise(data = dplyr::first(date))
+
+ts_saude <- stats::ts(data = base_saude$y, 
+          frequency = 365.25/7,
+          start = c(2017,01)
+)
+
+base_saude %>% 
+  dplyr::left_join(
+    ano_semana %>% dplyr::rename(x = data),
+    by = c("x")
+  ) %>% 
+  dplyr::mutate(break_point = fun_break_point(ts_saude)) %>% 
+  #Criação do gráfico
+  plotly::plot_ly(
+  x = ~x, 
+  y = ~y, 
+  type = 'scatter', 
+  mode = 'lines',
+  color = ~break_point,
+  text = ~paste('Ano semana: ',isoYearIsoWeek),
+  showlegend = FALSE
+) %>% 
+  #Layout
+  plotly::layout(
+    legend = list(
+      
+      orientation = "h",   #mostrar entradas horizontalmente
+      xanchor = "center",  #usar centralizado
+      x = 0.5), #coloca a legenda no centro do eixo-x
+    
+    xaxis = list(title = ''),
+    yaxis = list(title = 'Sessões', range = c(0,~y))
+    )
+```
+
+
+#### 5.4 Gráfico com os resultados de previsão
+
+```{r}
+metrica_ets_prophet_saude <- 
+  readr::read_rds(
+    "metricas-previsao-sessoes-sites/metricas_previsao_saude.Rda")
+
+metrica_sarima_saude <- readr::read_rds(
+  "metricas-previsao-sessoes-sites/metricas_previsao_sarima_saude.Rda") %>% 
+  dplyr::select(mape) %>% 
+  as.numeric() %>% 
+  round(digits = 3)*100
+
+################################################################################
+
+readr::read_rds("previsao-sessoes-sites/tbl_previsao_saude.Rda") %>% 
+  plotly::plot_ly(
+    
+    x = ~.index,
+    y = ~ACTUAL,
+    type = 'scatter', 
+    mode = 'lines',
+    name = 'Série',
+    text = ~paste('Ano semana: ',isoYearIsoWeek)
+    
+  ) %>% 
+  plotly::add_trace(
+    
+    x = ~.index,
+    y = ~PROPHET,
+    type = 'scatter', 
+    mode = 'lines',
+    name = str_c('Prophet - MAPE: ',round(metrica_ets_prophet_saude[2,5]$mape,1),"%"),
+    text = ~paste('Ano semana: ',isoYearIsoWeek)
+    
+  ) %>% 
+  plotly::add_trace(
+    x = ~.index,
+    y = ~`ETS(M,A,N)`,
+    type = 'scatter', 
+    mode = 'lines',
+    name = str_c('ETS - MAPE: ',round(metrica_ets_prophet_saude[1,5]$mape,1),"%"),
+    text = ~paste('Ano semana: ',isoYearIsoWeek)
+  ) %>% 
+    plotly::add_trace(
+    x = ~.index,
+    y = ~SARIMA,
+    type = 'scatter', 
+    mode = 'lines',
+    name = str_c('SARIMA - MAPE: ',metrica_sarima_saude,"%"),
+    text = ~paste('Ano semana: ',isoYearIsoWeek)
+  ) %>% 
+  plotly::layout(
+    legend = list(orientation = "h",   #mostrar entradas horizontalmente
+                  xanchor = "center",  #usar centralizado
+                  x = 0.5), #coloca a legenda no centro do eixo-x
+    xaxis = list(title = ''),
+    yaxis = list(title = '')
+  )
+```
+
+### 6. Site Superinteressante
+
+#### 6.1 Gráfico Série Temporal
+```{r}
+readr::read_rds("dados_p_graficos/base_superinteressante.Rda") %>% 
+  fun_plot_ts()
+```
+
+#### 6.2 Gráfico Decomposição Temporal
+
+```{r}
+decomposicao_temporal_superinteressante <- readr::read_rds("decomposicao_temporal/decomposicao_temporal_superinteressante.Rda")
+
+g1 <- plotly::plot_ly(
+  data = decomposicao_temporal_superinteressante,
+  x = ~data, 
+  y = ~Sessions,
+  name = 'Sessões',
+  type = 'scatter', 
+  mode = 'lines',
+  text = ~paste('Ano semana: ',isoYearIsoWeek)
+) %>% 
+  plotly::layout(
+    #title = "Decomposição temporal da série de Sessões do site Superinteressante",
+    legend = list(orientation = "h",   #mostrar entradas horizontalmente
+                  xanchor = "center",  #usar centralizado
+                  x = 0.5) #coloca a legenda no centro do eixo-x
+  )
+
+g2 <- plotly::plot_ly(
+  data = decomposicao_temporal_superinteressante,
+  x = ~data, 
+  y = ~Tendencia, 
+  name = 'Tendência',
+  type = 'scatter', 
+  mode = 'lines',
+  text = ~paste('Ano semana: ',isoYearIsoWeek)
+)
+
+g3 <- plotly::plot_ly(
+  data = decomposicao_temporal_superinteressante,
+  x = ~data, 
+  y = ~Sazonalidade, 
+  name = 'Sazonalidade',
+  type = 'scatter', 
+  mode = 'lines',
+  text = ~paste('Ano semana: ',isoYearIsoWeek)
+)
+
+g4 <- plotly::plot_ly(
+  data = decomposicao_temporal_superinteressante,
+  x = ~data, 
+  y = ~Aleatorio, 
+  name = 'Aleatório',
+  type = 'scatter', 
+  mode = 'lines',
+  text = ~paste('Ano semana: ',isoYearIsoWeek)
+)
+
+plotly::subplot(g1, g2, g3, g4, nrows = 4)
+```
+
+#### 6.3 Gráfico da Quebra estrutural
+
+```{r}
+base_superinteressante <- readr::read_rds("dados_p_graficos/base_superinteressante.Rda")
+df_superinteressante <- readxl::read_xlsx(
+  "dados_site/sites_consolidados_2015.01.01_2020.09.19.xlsx")
+
+ano_semana <- df_superinteressante %>% 
+  dplyr::mutate(isoYearIsoWeek = as.numeric(isoYearIsoWeek)) %>% 
+  dplyr::filter(dia_da_semana == "seg") %>% 
+  group_by(isoYearIsoWeek) %>% 
+  summarise(data = dplyr::first(date))
+
+ts_superinteressante <- stats::ts(data = base_superinteressante$y, 
+          frequency = 365.25/7,
+          start = c(2015,01)
+)
+
+base_superinteressante %>% 
+  dplyr::left_join(
+    ano_semana %>% dplyr::rename(x = data),
+    by = c("x")
+  ) %>% 
+  dplyr::mutate(break_point = fun_break_point(ts_superinteressante)) %>% 
+  #Criação do gráfico
+  plotly::plot_ly(
+  x = ~x, 
+  y = ~y, 
+  type = 'scatter', 
+  mode = 'lines',
+  color = ~break_point,
+  text = ~paste('Ano semana: ',isoYearIsoWeek),
+  showlegend = FALSE
+) %>% 
+  #Layout
+  plotly::layout(
+    legend = list(
+      
+      orientation = "h",   #mostrar entradas horizontalmente
+      xanchor = "center",  #usar centralizado
+      x = 0.5), #coloca a legenda no centro do eixo-x
+    
+    xaxis = list(title = ''),
+    yaxis = list(title = 'Sessões', range = c(0,~y))
+    )
+```
+
+
+#### 6.4 Gráfico com os resultados de previsão
+
+```{r}
+metrica_ets_prophet_superinteressante <- 
+  readr::read_rds(
+    "metricas-previsao-sessoes-sites/metricas_previsao_superinteressante.Rda")
+
+metrica_sarima_superinteressante <- readr::read_rds(
+  "metricas-previsao-sessoes-sites/metricas_previsao_sarima_superinteressante.Rda") %>% 
+  dplyr::select(mape) %>% 
+  as.numeric() %>% 
+  round(digits = 3)*100
+
+################################################################################
+
+readr::read_rds("previsao-sessoes-sites/tbl_previsao_superinteressante.Rda") %>% 
+  plotly::plot_ly(
+    
+    x = ~.index,
+    y = ~ACTUAL,
+    type = 'scatter', 
+    mode = 'lines',
+    name = 'Série',
+    text = ~paste('Ano semana: ',isoYearIsoWeek)
+    
+  ) %>% 
+  plotly::add_trace(
+    
+    x = ~.index,
+    y = ~PROPHET,
+    type = 'scatter', 
+    mode = 'lines',
+    name = str_c('Prophet - MAPE: ',round(metrica_ets_prophet_superinteressante[2,5]$mape,1),"%"),
+    text = ~paste('Ano semana: ',isoYearIsoWeek)
+    
+  ) %>% 
+  plotly::add_trace(
+    x = ~.index,
+    y = ~`ETS(M,AD,N)`,
+    type = 'scatter', 
+    mode = 'lines',
+    name = str_c('ETS - MAPE: ',round(metrica_ets_prophet_superinteressante[1,5]$mape,1),"%"),
+    text = ~paste('Ano semana: ',isoYearIsoWeek)
+  ) %>% 
+      plotly::add_trace(
+    x = ~.index,
+    y = ~SARIMA,
+    type = 'scatter', 
+    mode = 'lines',
+    name = str_c('SARIMA - MAPE: ',metrica_sarima_superinteressante,"%"),
+    text = ~paste('Ano semana: ',isoYearIsoWeek)
+  ) %>% 
+  plotly::layout(
+    legend = list(orientation = "h",   #mostrar entradas horizontalmente
+                  xanchor = "center",  #usar centralizado
+                  x = 0.5), #coloca a legenda no centro do eixo-x
+    xaxis = list(title = ''),
+    yaxis = list(title = '')
+  )
+```
+
+
+### 7. Site Veja
+
+#### 7.1 Gráfico Série Temporal 
+
+```{r}
+readr::read_rds("dados_p_graficos/base_veja.Rda") %>% 
+  fun_plot_ts()
+```
+
+#### 7.2 Gráfico Decomposição Temporal
+
+```{r}
+decomposicao_temporal_veja <- readr::read_rds("decomposicao_temporal/decomposicao_temporal_veja.Rda")
+
+g1 <- plotly::plot_ly(
+  data = decomposicao_temporal_veja,
+  x = ~data, 
+  y = ~Sessions,
+  name = 'Sessões',
+  type = 'scatter', 
+  mode = 'lines',
+  text = ~paste('Ano semana: ',isoYearIsoWeek)
+) %>% 
+  plotly::layout(
+    #title = "Decomposição temporal da série de Sessões do site Veja",
+    legend = list(orientation = "h",   #mostrar entradas horizontalmente
+                  xanchor = "center",  #usar centralizado
+                  x = 0.5) #coloca a legenda no centro do eixo-x
+  )
+
+g2 <- plotly::plot_ly(
+  data = decomposicao_temporal_veja,
+  x = ~data, 
+  y = ~Tendencia, 
+  name = 'Tendência',
+  type = 'scatter', 
+  mode = 'lines',
+  text = ~paste('Ano semana: ',isoYearIsoWeek)
+)
+
+g3 <- plotly::plot_ly(
+  data = decomposicao_temporal_veja,
+  x = ~data, 
+  y = ~Sazonalidade, 
+  name = 'Sazonalidade',
+  type = 'scatter', 
+  mode = 'lines',
+  text = ~paste('Ano semana: ',isoYearIsoWeek)
+)
+
+g4 <- plotly::plot_ly(
+  data = decomposicao_temporal_veja,
+  x = ~data, 
+  y = ~Aleatorio, 
+  name = 'Aleatório',
+  type = 'scatter', 
+  mode = 'lines',
+  text = ~paste('Ano semana: ',isoYearIsoWeek)
+)
+
+plotly::subplot(g1, g2, g3, g4, nrows = 4)
+```
+
+#### 7.3 Gráfico da Quebra estrutural
+
+```{r}
+base_veja <- readr::read_rds("dados_p_graficos/base_veja.Rda")
+df_veja <- readxl::read_xlsx(
+  "dados_site/sites_consolidados_2015.01.01_2020.09.19.xlsx")
+
+ano_semana <- df_veja %>% 
+  dplyr::mutate(isoYearIsoWeek = as.numeric(isoYearIsoWeek)) %>% 
+  dplyr::filter(dia_da_semana == "seg") %>% 
+  group_by(isoYearIsoWeek) %>% 
+  summarise(data = dplyr::first(date))
+
+ts_veja <- stats::ts(data = base_veja$y, 
+          frequency = 365.25/7,
+          start = c(2015,01)
+)
+
+base_veja %>% 
+  dplyr::left_join(
+    ano_semana %>% dplyr::rename(x = data),
+    by = c("x")
+  ) %>% 
+  dplyr::mutate(break_point = fun_break_point(ts_veja)) %>% 
+  #Criação do gráfico
+  plotly::plot_ly(
+  x = ~x, 
+  y = ~y, 
+  type = 'scatter', 
+  mode = 'lines',
+  color = ~break_point,
+  text = ~paste('Ano semana: ',isoYearIsoWeek),
+  showlegend = FALSE
+) %>% 
+  #Layout
+  plotly::layout(
+    legend = list(
+      
+      orientation = "h",   #mostrar entradas horizontalmente
+      xanchor = "center",  #usar centralizado
+      x = 0.5), #coloca a legenda no centro do eixo-x
+    
+    xaxis = list(title = ''),
+    yaxis = list(title = 'Sessões', range = c(0,~y))
+    )
+```
+
+
+#### 7.4 Gráfico com os resultados de previsão
+
+```{r}
+metrica_ets_prophet_veja <- 
+  readr::read_rds(
+    "metricas-previsao-sessoes-sites/metricas_previsao_veja.Rda")
+
+metrica_sarima_veja <- readr::read_rds(
+  "metricas-previsao-sessoes-sites/metricas_previsao_sarima_veja.Rda") %>% 
+  dplyr::select(mape) %>% 
+  as.numeric() %>% 
+  round(digits = 3)*100
+
+################################################################################
+
+readr::read_rds("previsao-sessoes-sites/tbl_previsao_veja.Rda") %>% 
+  plotly::plot_ly(
+    
+    x = ~.index,
+    y = ~ACTUAL,
+    type = 'scatter', 
+    mode = 'lines',
+    name = 'Série',
+    text = ~paste('Ano semana: ',isoYearIsoWeek)
+    
+  ) %>% 
+  plotly::add_trace(
+    
+    x = ~.index,
+    y = ~PROPHET,
+    type = 'scatter', 
+    mode = 'lines',
+    name = str_c('Prophet - MAPE: ',round(metrica_ets_prophet_veja[2,5]$mape,1),"%"),
+    text = ~paste('Ano semana: ',isoYearIsoWeek)
+    
+  ) %>% 
+  plotly::add_trace(
+    x = ~.index,
+    y = ~`ETS(M,N,N)`,
+    type = 'scatter', 
+    mode = 'lines',
+    name = str_c('ETS- MAPE: ',round(metrica_ets_prophet_veja[1,5]$mape,1),"%"),
+    text = ~paste('Ano semana: ',isoYearIsoWeek)
+  ) %>% 
+      plotly::add_trace(
+    x = ~.index,
+    y = ~SARIMA,
+    type = 'scatter', 
+    mode = 'lines',
+    name = str_c('SARIMA - MAPE: ',metrica_sarima_veja,"%"),
+    text = ~paste('Ano semana: ',isoYearIsoWeek)
+  ) %>% 
+  plotly::layout(
+    legend = list(orientation = "h",   #mostrar entradas horizontalmente
+                  xanchor = "center",  #usar centralizado
+                  x = 0.5), #coloca a legenda no centro do eixo-x
+    xaxis = list(title = ''),
+    yaxis = list(title = '')
+  )
+```
+
+
+### 8. Site Claudia (Com Parceiros)
+
+#### 8.1 Gráfico Série Temporal
+```{r}
+readr::read_rds("dados_p_graficos/base_claudia.Rda") %>% 
+  fun_plot_ts()
+```
+
+
+#### 8.2 Gráfico Decomposição Temporal
+
+```{r}
+decomposicao_temporal_claudia <- readr::read_rds("decomposicao_temporal/decomposicao_temporal_claudia.Rda")
+
+g1 <- plotly::plot_ly(
+  data = decomposicao_temporal_claudia,
+  x = ~data, 
+  y = ~Sessions,
+  name = 'Sessões',
+  type = 'scatter', 
+  mode = 'lines',
+  text = ~paste('Ano semana: ',isoYearIsoWeek)
+) %>% 
+  plotly::layout(
+    #title = "Decomposição temporal da série de Sessões do site Claudia (com parceiros)",
+    legend = list(orientation = "h",   #mostrar entradas horizontalmente
+                  xanchor = "center",  #usar centralizado
+                  x = 0.5) #coloca a legenda no centro do eixo-x
+  )
+
+g2 <- plotly::plot_ly(
+  data = decomposicao_temporal_claudia,
+  x = ~data, 
+  y = ~Tendencia, 
+  name = 'Tendência',
+  type = 'scatter', 
+  mode = 'lines',
+  text = ~paste('Ano semana: ',isoYearIsoWeek)
+)
+
+g3 <- plotly::plot_ly(
+  data = decomposicao_temporal_claudia,
+  x = ~data, 
+  y = ~Sazonalidade, 
+  name = 'Sazonalidade',
+  type = 'scatter', 
+  mode = 'lines',
+  text = ~paste('Ano semana: ',isoYearIsoWeek)
+)
+
+g4 <- plotly::plot_ly(
+  data = decomposicao_temporal_claudia,
+  x = ~data, 
+  y = ~Aleatorio, 
+  name = 'Aleatório',
+  type = 'scatter', 
+  mode = 'lines',
+  text = ~paste('Ano semana: ',isoYearIsoWeek)
+)
+
+plotly::subplot(g1, g2, g3, g4, nrows = 4)
+```
+
+#### 8.3 Gráfico da Quebra estrutural
+
+```{r}
+base_claudia <- readr::read_rds("dados_p_graficos/base_claudia.Rda")
+df_claudia <- readxl::read_xlsx(
+  "dados_site/sites_consolidados_2015.01.01_2020.09.19.xlsx")
+
+ano_semana <- df_claudia %>% 
+  dplyr::mutate(isoYearIsoWeek = as.numeric(isoYearIsoWeek)) %>% 
+  dplyr::filter(dia_da_semana == "seg") %>% 
+  group_by(isoYearIsoWeek) %>% 
+  summarise(data = dplyr::first(date))
+
+ts_claudia <- stats::ts(data = base_claudia$y, 
+          frequency = 365.25/7,
+          start = c(2017,01)
+)
+
+base_claudia %>% 
+  dplyr::left_join(
+    ano_semana %>% dplyr::rename(x = data),
+    by = c("x")
+  ) %>% 
+  dplyr::mutate(break_point = fun_break_point(ts_claudia)) %>% 
+  #Criação do gráfico
+  plotly::plot_ly(
+  x = ~x, 
+  y = ~y, 
+  type = 'scatter', 
+  mode = 'lines',
+  color = ~break_point,
+  text = ~paste('Ano semana: ',isoYearIsoWeek),
+  showlegend = FALSE
+) %>% 
+  #Layout
+  plotly::layout(
+    legend = list(
+      
+      orientation = "h",   #mostrar entradas horizontalmente
+      xanchor = "center",  #usar centralizado
+      x = 0.5), #coloca a legenda no centro do eixo-x
+    
+    xaxis = list(title = ''),
+    yaxis = list(title = 'Sessões', range = c(0,~y))
+    )
+```
+
+
+#### 8.4 Gráfico com os resultados de previsão
+
+```{r}
+metrica_ets_prophet_claudia <- 
+  readr::read_rds(
+    "metricas-previsao-sessoes-sites/metricas_previsao_claudia.Rda")
+
+metrica_sarima_claudia <- readr::read_rds(
+  "metricas-previsao-sessoes-sites/metricas_previsao_sarima_claudia.Rda") %>% 
+  dplyr::select(mape) %>% 
+  as.numeric() %>% 
+  round(digits = 3)*100
+
+################################################################################
+
+readr::read_rds("previsao-sessoes-sites/tbl_previsao_claudia.Rda") %>% 
+  plotly::plot_ly(
+    
+    x = ~.index,
+    y = ~ACTUAL,
+    type = 'scatter', 
+    mode = 'lines',
+    name = 'Série',
+    text = ~paste('Ano semana: ',isoYearIsoWeek)
+    
+  ) %>% 
+  plotly::add_trace(
+    
+    x = ~.index,
+    y = ~PROPHET,
+    type = 'scatter', 
+    mode = 'lines',
+    name = str_c('Prophet - MAPE: ',round(metrica_ets_prophet_claudia[2,5]$mape,1),"%"),
+    text = ~paste('Ano semana: ',isoYearIsoWeek)
+    
+  ) %>% 
+  plotly::add_trace(
+    x = ~.index,
+    y = ~`ETS(M,N,N)`,
+    type = 'scatter', 
+    mode = 'lines',
+    name = str_c('ETS - MAPE: ',round(metrica_ets_prophet_claudia[1,5]$mape,1),"%"),
+    text = ~paste('Ano semana: ',isoYearIsoWeek)
+  ) %>% 
+      plotly::add_trace(
+    x = ~.index,
+    y = ~SARIMA,
+    type = 'scatter', 
+    mode = 'lines',
+    name = str_c('SARIMA - MAPE: ',metrica_sarima_claudia,"%"),
+    text = ~paste('Ano semana: ',isoYearIsoWeek)
+  ) %>% 
+  plotly::layout(
+    legend = list(orientation = "h",   #mostrar entradas horizontalmente
+                  xanchor = "center",  #usar centralizado
+                  x = 0.5), #coloca a legenda no centro do eixo-x
+    xaxis = list(title = ''),
+    yaxis = list(title = '')
+  )
+```
