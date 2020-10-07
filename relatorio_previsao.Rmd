@@ -5,9 +5,9 @@ date: ""
 output: html_document
 ---
 
-### 0. Introdução
+### Introdução
 
-Neste relatório estão gráficos que visam entender o comportamento semanal de cada revista através do número de sessões, dados esses obtidos pela ferramenta Google Analytics. À princípio seriam analisados oito sites, porém Você S/A teve de ficar de fora por não ter histórico de dados suficiente. Os períodos de cada site costumam variar, alguns começando em Janeiro/2015 e outros em Jan/2017.
+Neste relatório estão gráficos que visam entender o comportamento semanal de cada revista através do número de sessões, dados esses obtidos pela ferramenta Google Analytics. À princípio seriam analisados nove sites, porém o site Você S/A teve de ficar de fora por não ter histórico de dados suficiente. Os períodos de cada site costumam variar, alguns começando em Janeiro/2015 e outros em Jan/2017.
 
 Serão analisados os seguintes sites:
 
@@ -22,10 +22,10 @@ Serão analisados os seguintes sites:
 
 Cada site contém os seguintes tópicos:
 
-1. Gráfico da série temporal com a curva basal e os pontos influentes (outliers).
+1. Gráfico da série temporal com a curva basal (nível médio da série) e os pontos influentes (outliers).
 2. Gráfico de decomposição série temporal para identificar tendência e sazonalidade.
-3. Gráfico de Quebra estrutural, caso a série temporal apresente ponto de ruptura.
-4. Gráfico com a série temporal e quatro resultados de previsão para 30 semanas.
+3. Gráfico de quebra estrutural, caso a série temporal apresente ponto de mudança de nível.
+4. Previsão de quatro modelos estatísticos para prever 30 semanas (Para critérios de avaliação dos dados de teste, foi utilizada a métrica de erro absoluto percentual médio - **MAPE**).
 
 ```{r, echo=FALSE}
 
@@ -62,7 +62,25 @@ source("chart/prep_data/fun_break_point.R", encoding = "UTF-8")
 
 ### 1. Site Boa Forma
 
-#### 1.1 Gráfico Série Temporal
+#### 1.1 Gráfico da série temporal
+
+Verifica-se a presença de outliers entre os períodos de 14/ago/2017 a 04/set/2017. Páginas que tiveram como títulos dieta/emagrecimento e Paolla Oliveira podem ter motivado esse aumento no número de sessões.
+
+Matérias que explicam os outliers:
+Semana com início em 14/08/2017: [Chá de hibisco: para que serve, como preparar e quem deve evitar](boaforma.abril.com.br/dieta/dieta-do-cha-de-hibisco-elimina-ate-4-quilos-em-15-dias/)
+Semana com início
+
+Considerando o ano de 2017 como base e considerando *o número médio de sessões por semana de cada ano*, -0,2% em relação a 2018, -25% em relação a 2019 e -52,7% em relação a 2020 (até a semana 14/09/2020).
+
+```{r, eval = F}
+readr::read_rds("dados_p_graficos/base_boaforma.Rda") %>% 
+  dplyr::mutate(ano = lubridate::year(x)) %>% 
+  group_by(ano) %>% 
+  summarise(media = mean(y)) %>% 
+  dplyr::mutate(media_2017 = dplyr::first(media),
+                variacao = 100*(1- media_2017/media))
+```
+
 
 ```{r}
 readr::read_rds("dados_p_graficos/base_boaforma.Rda") %>% 
@@ -70,7 +88,27 @@ readr::read_rds("dados_p_graficos/base_boaforma.Rda") %>%
 ```
 
 
-### 1.2 Gráfico Decomposição temporal
+#### 1.2 Gráfico de decomposição temporal
+Como visto anteriormente, a série já vinha apresentando um comportamento de queda comparando 2017 com os demais anos. 
+
+Considerando as *variações anuais do total de sessões*, temos:
+
+* 2017-2018: +1,7%
+* 2018-2019: -21,4%
+* 2019-2020: -41,7%
+
+Apesar de apresentar picos/spikes na decomposição sazonal, a série não apresenta sazonalidade significativa.
+
+```{r, eval = F}
+readr::read_rds("dados_p_graficos/base_boaforma.Rda") %>% 
+  mutate(ano = lubridate::year(x)) %>% 
+  group_by(ano) %>% 
+  summarise(y_sessoes = sum(y)) %>% 
+  mutate(lag_sessoes = lag(y_sessoes, 1),
+         divisao = 100*(y_sessoes/lag_sessoes)-100)
+```
+
+
 
 ```{r}
 decomposicao_temporal_boaforma <- readr::read_rds("decomposicao_temporal/decomposicao_temporal_boaforma.Rda")
@@ -123,10 +161,17 @@ g4 <- plotly::plot_ly(
   text = ~paste('Ano semana: ',isoYearIsoWeek)
 )
 
-plotly::subplot(g1, g2, g3, g4, nrows = 4)
+plotly::subplot(g1, g2, g3, g4, nrows = 4, shareX = T)
 ```
 
-### 1.3 Gráfico Quebra estrutural
+#### 1.3 Gráfico de quebra estrutural
+A série apresentou três quebras estruturais significativas.
+
+* A primeira ocorrendo na semana 30 de 2017, ocasionando um crescimento de 36% em relação à basal anterior. 
+* A segunda ocorrendo na semana 16 de 2018, apresentando uma queda de 18% em relação à basal anterior.
+* A terceira ocorrendo na semana 23 de 2019, apresentando uma queda de 31,5% em relação à basal anterior.
+
+
 ```{r}
 base_boaforma <- readr::read_rds("dados_p_graficos/base_boaforma.Rda")
 df_boaforma <- readxl::read_xlsx(
@@ -173,7 +218,32 @@ base_boaforma %>%
     )
 ```
 
-### 1.4 Gráfico com os resultados de previsão
+
+```{r, eval = F}
+#Variação na quebra estrutural
+base_boaforma %>% 
+  dplyr::left_join(
+    ano_semana %>% dplyr::rename(x = data),
+    by = c("x")
+  ) %>% 
+  dplyr::mutate(break_point = fun_break_point(ts_boaforma)) %>% 
+  dplyr::group_by(break_point) %>% 
+  dplyr::summarise(media_y = mean(y)) %>% 
+  dplyr::mutate(y_lag = dplyr::lag(media_y, 1),
+                divisao = 100*round(media_y/y_lag-1,2)) %>% 
+  stats::na.omit()
+```
+
+
+#### 1.4 Gráfico com os resultados de previsão
+
+Por ordenação, tivemos os seguintes *MAPEs*:
+
+* Ensemble - 14,7%
+* Prophet - 14,9%
+* SARIMA - 29%
+* ETS - 38%
+
 ```{r}
 metrica_ets_prophet_boaforma <- 
   readr::read_rds(
@@ -183,6 +253,10 @@ metrica_sarima_boaforma <- readr::read_rds(
   "metricas-previsao-sessoes-sites/metricas_previsao_sarima_boaforma.Rda") %>% 
   dplyr::select(mape) %>% 
   as.numeric() %>% 
+  round(digits = 3)*100
+
+metrica_ensemble_boaforma <- readr::read_rds("previsao-modelos-ensemble/modelo_ensemble_boaforma.Rda") %>% 
+  dplyr::distinct(MAPE_ensemble) %>% 
   round(digits = 3)*100
 
 ################################################################################
@@ -218,12 +292,22 @@ readr::read_rds("previsao-sessoes-sites/tbl_previsao_boaforma.Rda") %>%
     text = ~paste('Ano semana: ',isoYearIsoWeek)
   ) %>% 
     plotly::add_trace(
+    data = readr::read_rds("previsao-sessoes-sites/tbl_sarima_boaforma.Rda"),
     x = ~.index,
     y = ~SARIMA,
     type = 'scatter', 
     mode = 'lines',
     name = str_c('SARIMA - MAPE: ',metrica_sarima_boaforma),
     text = ~paste('Ano semana: ',isoYearIsoWeek)
+  ) %>% 
+  plotly::add_trace(
+    data = readr::read_rds("previsao-modelos-ensemble/modelo_ensemble_boaforma.Rda"),
+    x = ~.index,
+    y = ~modelo_ensemble,
+    type = 'scatter',
+    mode = 'lines',
+    name = str_c('Ensemble - MAPE: ', metrica_ensemble_boaforma$MAPE_ensemble, "%"),
+    text = ~paste('Ano semana: ', isoYearIsoWeek)
   ) %>% 
   
   plotly::layout(
@@ -239,20 +323,45 @@ readr::read_rds("previsao-sessoes-sites/tbl_previsao_boaforma.Rda") %>%
 
 #### 2. Site Capricho
 
-### 2.1 Gráfico Série Temporal
+### 2.1 Gráfico da série temporal
+
+A série apresenta outliers em períodos diferentes. Como é um site que veicula matérias ligadas às personalidades, é normal que esses picos estejam associados a elas e não a uma tendência de comportamento.
+
+A série apresentou de 2015 até meados de julho de 2017, uma basal em torno de 3.5M. De agosto de 2018 até (14/09/2020), o comportamento foi de queda.
 
 ```{r}
 readr::read_rds("dados_p_graficos/base_capricho.Rda") %>% 
   fun_plot_ts()
 ```
 
-### 2.2 Gráfico Decomposição Temporal
+
+```{r, eval = F}
+readr::read_rds("dados_p_graficos/base_capricho.Rda")  %>% 
+  mutate(ano = lubridate::year(x)) %>% 
+  group_by(ano) %>% 
+  summarise(y_sessoes = sum(y)) %>% 
+  mutate(lag_sessoes = lag(y_sessoes, 1),
+         divisao = 100*(y_sessoes/lag_sessoes)-100)
+```
+
+#### 2.2 Gráfico de decomposição temporal
+
+Considerando as variações anuais do total de sessões, temos:
+
+* 2015-2016: -4%
+* 2016-2017: +12,1%
+* 2017-2018: -8,3%
+* 2018-2019: -21.2%
+* 2019-2020: -42,8%
+
+Apesar de apresentar picos/spikes na decomposição sazonal, a série não apresenta sazonalidade significativa.
+
 
 ```{r}
-decomposicao_temporal_claudia <- readr::read_rds("decomposicao_temporal/decomposicao_temporal_capricho.Rda")
+decomposicao_temporal_capricho <- readr::read_rds("decomposicao_temporal/decomposicao_temporal_capricho.Rda")
 
 g1 <- plotly::plot_ly(
-  data = decomposicao_temporal_claudia,
+  data = decomposicao_temporal_capricho,
   x = ~data, 
   y = ~Sessions,
   name = 'Sessões',
@@ -261,14 +370,14 @@ g1 <- plotly::plot_ly(
   text = ~paste('Ano semana: ',isoYearIsoWeek)
 ) %>% 
   plotly::layout(
-    #title = "Decomposição temporal da série de Sessões do site claudia",
+    #title = "Decomposição temporal da série de Sessões do site capricho",
     legend = list(orientation = "h",   #mostrar entradas horizontalmente
                   xanchor = "center",  #usar centralizado
                   x = 0.5) #coloca a legenda no centro do eixo-x
   )
 
 g2 <- plotly::plot_ly(
-  data = decomposicao_temporal_claudia,
+  data = decomposicao_temporal_capricho,
   x = ~data, 
   y = ~Tendencia, 
   name = 'Tendência',
@@ -278,7 +387,7 @@ g2 <- plotly::plot_ly(
 )
 
 g3 <- plotly::plot_ly(
-  data = decomposicao_temporal_claudia,
+  data = decomposicao_temporal_capricho,
   x = ~data, 
   y = ~Sazonalidade, 
   name = 'Sazonalidade',
@@ -288,7 +397,7 @@ g3 <- plotly::plot_ly(
 )
 
 g4 <- plotly::plot_ly(
-  data = decomposicao_temporal_claudia,
+  data = decomposicao_temporal_capricho,
   x = ~data, 
   y = ~Aleatorio, 
   name = 'Aleatório',
@@ -297,10 +406,27 @@ g4 <- plotly::plot_ly(
   text = ~paste('Ano semana: ',isoYearIsoWeek)
 )
 
-plotly::subplot(g1, g2, g3, g4, nrows = 4)
+plotly::subplot(g1, g2, g3, g4, nrows = 4, shareX = T)
 ```
 
-#### 2.3 Gráfico da Quebra estrutural
+
+```{r, eval = F}
+readr::read_rds("dados_p_graficos/base_capricho.Rda") %>% 
+  mutate(ano = lubridate::year(x)) %>% 
+  group_by(ano) %>% 
+  summarise(y_sessoes = sum(y)) %>% 
+  mutate(lag_sessoes = lag(y_sessoes, 1),
+         divisao = 100*(y_sessoes/lag_sessoes)-100)
+```
+
+
+#### 2.3 Gráfico de quebra estrutural
+
+A série apresentou três quebras estruturais significativas.
+
+* A primeira ocorrendo na semana 28 de 2017, ocasionando um crescimento de 13% em relação à basal anterior. 
+* A segunda ocorrendo na semana 31 de 2018, apresentando uma queda de 25% em relação à basal anterior.
+* A terceira ocorrendo na semana 34 de 2019, apresentando uma queda de 25% em relação à basal anterior.
 
 ```{r}
 base_capricho <- readr::read_rds("dados_p_graficos/base_capricho.Rda")
@@ -349,7 +475,30 @@ base_capricho %>%
 ```
 
 
-### 2.4 Gráfico com os resultados de previsão para 30 semanas à frente
+```{r, eval = F}
+#Variação na quebra estrutural
+base_capricho %>% 
+  dplyr::left_join(
+    ano_semana %>% dplyr::rename(x = data),
+    by = c("x")
+  ) %>% 
+  dplyr::mutate(break_point = fun_break_point(ts_capricho)) %>% 
+  dplyr::group_by(break_point) %>% 
+  dplyr::summarise(media_y = mean(y)) %>% 
+  dplyr::mutate(y_lag = dplyr::lag(media_y, 1),
+                divisao = 100*round(media_y/y_lag-1,2)) %>% 
+  stats::na.omit()
+```
+
+#### 2.4 Gráfico com os resultados de previsão para 30 semanas à frente
+
+Por ordem, tivemos os seguintes *MAPEs*:
+
+* Prophet - 44,4%
+* Ensemble - 44,8%
+* SARIMA - 56,4%
+* ETS - 72,6%
+
 ```{r}
 metrica_ets_prophet_capricho <- 
   readr::read_rds(
@@ -359,6 +508,10 @@ metrica_sarima_capricho <- readr::read_rds(
   "metricas-previsao-sessoes-sites/metricas_previsao_sarima_capricho.Rda") %>% 
   dplyr::select(mape) %>% 
   as.numeric() %>% 
+  round(digits = 3)*100
+
+metrica_ensemble_capricho <- readr::read_rds("previsao-modelos-ensemble/modelo_ensemble_capricho.Rda") %>% 
+  dplyr::distinct(MAPE_ensemble) %>% 
   round(digits = 3)*100
 
 ################################################################################
@@ -393,12 +546,22 @@ readr::read_rds("previsao-sessoes-sites/tbl_previsao_capricho.Rda") %>%
    text = ~paste('Ano semana: ',isoYearIsoWeek)
  ) %>% 
     plotly::add_trace(
+    data = readr::read_rds("previsao-sessoes-sites/tbl_sarima_capricho.Rda"),
     x = ~.index,
     y = ~SARIMA,
     type = 'scatter', 
     mode = 'lines',
     name = str_c('SARIMA - MAPE: ',metrica_sarima_capricho,"%"),
     text = ~paste('Ano semana: ',isoYearIsoWeek)
+  ) %>% 
+    plotly::add_trace(
+    data = readr::read_rds("previsao-modelos-ensemble/modelo_ensemble_capricho.Rda"),
+    x = ~.index,
+    y = ~modelo_ensemble,
+    type = 'scatter',
+    mode = 'lines',
+    name = str_c('Ensemble - MAPE: ', metrica_ensemble_capricho$MAPE_ensemble),
+    text = ~paste('Ano semana: ', isoYearIsoWeek)
   ) %>% 
   plotly::layout(
     legend = list(orientation = "h",   #mostrar entradas horizontalmente
@@ -412,14 +575,30 @@ readr::read_rds("previsao-sessoes-sites/tbl_previsao_capricho.Rda") %>%
 
 ### 3. Site Guia do Estudante
 
-#### 3.1 Gráfico da Série Temporal
+#### 3.1 Gráfico da série temporal
+
+A série do site Guia do Estudante apresenta outliers em períodos específicos de janeiro que corresponde à divulgação dos resultados do ENEM e outubro/novembro que correspondem às datas do exame.
+
 ```{r}
 readr::read_rds("dados_p_graficos/base_guiadoestudante.Rda") %>% 
   fun_plot_ts()
 ```
 
 
-#### 3.2 Gráfico Decomposição temporal
+#### 3.2 Gráfico de decomposição temporal
+
+Do período de 2015 a 2017 a série se manteve no mesmo patamar, ocorrendo uma quebra estrutural a partir do meio do ano de 2018, levando a um comportamento de tendência de queda.
+
+A série apresenta um comportamento sazonal em torno da semana 43/44 que é a data do ENEM.
+
+Variação anual do total de sessões:
+
+* 2015-2016: -8,4%
+* 2016-2017: +7,1%
+* 2017-2018: -9,6%
+* 2018-2019: -15,5%
+* 2019-2020: -41,1%
+
 ```{r}
 decomposicao_temporal_guiadoestudante <- readr::read_rds("decomposicao_temporal/decomposicao_temporal_guiadoestudante.Rda")
 
@@ -469,10 +648,25 @@ g4 <- plotly::plot_ly(
   text = ~paste('Ano semana: ',isoYearIsoWeek)
 )
 
-plotly::subplot(g1, g2, g3, g4, nrows = 4)
+plotly::subplot(g1, g2, g3, g4, nrows = 4, shareX = T)
 ```
 
-#### 3.3 Gráfico da Quebra estrutural
+
+```{r, eval = F}
+readr::read_rds("dados_p_graficos/base_guiadoestudante.Rda") %>% 
+  mutate(ano = lubridate::year(x)) %>% 
+  group_by(ano) %>% 
+  summarise(y_sessoes = sum(y)) %>% 
+  mutate(lag_sessoes = lag(y_sessoes, 1),
+         divisao = 100*(y_sessoes/lag_sessoes)-100)
+```
+
+#### 3.3 Gráfico de quebra estrutural
+
+A série apresentou apenas uma quebra estrutural significativa.
+
+* A quebra estrutural ocorreu na semana 25 de 2018, ocasionando uma queda de 27% em relação ao período anterior.
+
 
 ```{r}
 base_guiadoestudante <- readr::read_rds("dados_p_graficos/base_guiadoestudante.Rda")
@@ -519,7 +713,30 @@ base_guiadoestudante %>%
     )
 ```
 
+
+```{r, eval = F}
+#Variação na quebra estrutural
+base_guiadoestudante %>% 
+  dplyr::left_join(
+    ano_semana %>% dplyr::rename(x = data),
+    by = c("x")
+  ) %>% 
+  dplyr::mutate(break_point = fun_break_point(ts_guiadoestudante)) %>% 
+  dplyr::group_by(break_point) %>% 
+  dplyr::summarise(media_y = mean(y)) %>% 
+  dplyr::mutate(y_lag = dplyr::lag(media_y, 1),
+                divisao = 100*round(media_y/y_lag-1,2)) %>% 
+  stats::na.omit()
+```
+
 #### 3.4 Gráfico com os resultados de previsão
+
+Por ordenação, tivemos os seguintes *MAPEs*:
+
+* Ensemble - 11,9%
+* Prophet - 13,6%
+* ETS - 26,2%
+* SARIMA - 36,5%
 
 ```{r}
 metrica_ets_prophet_guiadoestudante <- 
@@ -530,6 +747,10 @@ metrica_sarima_guiadoestudante <- readr::read_rds(
   "metricas-previsao-sessoes-sites/metricas_previsao_sarima_guiadoestudante.Rda") %>% 
   dplyr::select(mape) %>% 
   as.numeric() %>% 
+  round(digits = 3)*100
+
+metrica_ensemble_guiadoestudante <- readr::read_rds("previsao-modelos-ensemble/modelo_ensemble_guiadoestudante.Rda") %>% 
+  dplyr::distinct(MAPE_ensemble) %>% 
   round(digits = 3)*100
 
 ################################################################################
@@ -563,13 +784,23 @@ readr::read_rds("previsao-sessoes-sites/tbl_previsao_guiadoestudante.Rda") %>%
     name = str_c('ETS - MAPE: ',round(metrica_ets_prophet_guiadoestudante[1,5]$mape,1),"%"),
     text = ~paste('Ano semana: ',isoYearIsoWeek)
   ) %>% 
-      plotly::add_trace(
+    plotly::add_trace(
+    data = readr::read_rds("previsao-sessoes-sites/tbl_sarima_guiadoestudante.Rda"),
     x = ~.index,
     y = ~SARIMA,
     type = 'scatter', 
     mode = 'lines',
     name = str_c('SARIMA - MAPE: ',metrica_sarima_guiadoestudante,"%"),
     text = ~paste('Ano semana: ',isoYearIsoWeek)
+  ) %>% 
+    plotly::add_trace(
+    data = readr::read_rds("previsao-modelos-ensemble/modelo_ensemble_guiadoestudante.Rda"),
+    x = ~.index,
+    y = ~modelo_ensemble,
+    type = 'scatter',
+    mode = 'lines',
+    name = str_c('Ensemble - MAPE: ', metrica_ensemble_guiadoestudante$MAPE_ensemble),
+    text = ~paste('Ano semana: ', isoYearIsoWeek)
   ) %>% 
   plotly::layout(
     legend = list(orientation = "h",   #mostrar entradas horizontalmente
@@ -583,14 +814,26 @@ readr::read_rds("previsao-sessoes-sites/tbl_previsao_guiadoestudante.Rda") %>%
 
 ### 4. Site Quatro Rodas
 
-#### 4.1 Gráfico Série Temporal
+#### 4.1 Gráfico da série temporal
+
+A série de Quatro Rodas apresentava uma tendência de crescimento até meados de agosto de 2019.
 
 ```{r}
 readr::read_rds("dados_p_graficos/base_quatrorodas.Rda") %>% 
   fun_plot_ts()
 ```
 
-#### 4.2 Gráfico Decomposição Temporal
+#### 4.2 Gráfico da decomposição temporal
+
+A série não apresenta sazonalidade significativa.
+
+*Variação anual do total de sessões*:
+
+* 2015-2016: +23,1%
+* 2016-2017: +35%
+* 2017-2018: +2,5%
+* 2018-2019: +20,2%
+* 2019-2020: -16%
 
 ```{r}
 decomposicao_temporal_quatrorodas <- readr::read_rds("decomposicao_temporal/decomposicao_temporal_quatrorodas.Rda")
@@ -641,10 +884,26 @@ g4 <- plotly::plot_ly(
   text = ~paste('Ano semana: ',isoYearIsoWeek)
 )
 
-plotly::subplot(g1, g2, g3, g4, nrows = 4)
+plotly::subplot(g1, g2, g3, g4, nrows = 4, shareX = T)
 ```
 
-#### 4.3 Gráfico da Quebra estrutural
+
+```{r, eval = F}
+readr::read_rds("dados_p_graficos/base_quatrorodas.Rda") %>% 
+  mutate(ano = lubridate::year(x)) %>% 
+  group_by(ano) %>% 
+  summarise(y_sessoes = sum(y)) %>% 
+  mutate(lag_sessoes = lag(y_sessoes, 1),
+         divisao = 100*(y_sessoes/lag_sessoes)-100)
+```
+
+#### 4.3 Gráfico de quebra estrutural
+
+A série apresentou três quebras estruturais significativas.
+
+* A primeira ocorrendo na semana 24 de 2016, ocasionando um crescimento de 41% em relação à basal anterior. 
+* A segunda ocorrendo na semana 19 de 2017, apresentando um crescimento de 21% em relação à basal anterior.
+* A terceira ocorrendo na semana 32 de 2019, apresentando um crescimento de 41% em relação à basal anterior.
 
 ```{r}
 base_quatrorodas <- readr::read_rds("dados_p_graficos/base_quatrorodas.Rda")
@@ -691,7 +950,32 @@ base_quatrorodas %>%
     )
 ```
 
+
+```{r, eval = F}
+#Variação na quebra estrutural
+base_quatrorodas %>% 
+  dplyr::left_join(
+    ano_semana %>% dplyr::rename(x = data),
+    by = c("x")
+  ) %>% 
+  dplyr::mutate(break_point = fun_break_point(ts_quatrorodas)) %>% 
+  dplyr::group_by(break_point) %>% 
+  dplyr::summarise(media_y = mean(y)) %>% 
+  dplyr::mutate(y_lag = dplyr::lag(media_y, 1),
+                divisao = 100*round(media_y/y_lag-1,2)) %>% 
+  stats::na.omit()
+```
+
 #### 4.4 Gráfico com os resultados de previsão
+
+Por ordem, tivemos os seguintes *MAPEs*:
+
+* SARIMA - 43.9%
+* Ensemble - 43.9%
+* Prophet - 47%
+* ETS - 47%
+
+*Apesar da métrica ter dado 47% de MAPE para o modelo Prophet e ETS, a estimação de cada modelo apresentou previsões diferentes para fora da amostra.
 
 ```{r}
 metrica_ets_prophet_quatrorodas <- 
@@ -702,6 +986,10 @@ metrica_sarima_quatrorodas <- readr::read_rds(
   "metricas-previsao-sessoes-sites/metricas_previsao_sarima_quatrorodas.Rda") %>% 
   dplyr::select(mape) %>% 
   as.numeric() %>% 
+  round(digits = 3)*100
+
+metrica_ensemble_quatrorodas <- readr::read_rds("previsao-modelos-ensemble/modelo_ensemble_quatrorodas.Rda") %>% 
+  dplyr::distinct(MAPE_ensemble) %>% 
   round(digits = 3)*100
 
 ################################################################################
@@ -735,13 +1023,23 @@ readr::read_rds("previsao-sessoes-sites/tbl_previsao_quatrorodas.Rda") %>%
     name = str_c('ETS - MAPE: ',round(metrica_ets_prophet_quatrorodas[1,5]$mape,1),"%"),
     text = ~paste('Ano semana: ',isoYearIsoWeek)
   ) %>% 
-      plotly::add_trace(
+    plotly::add_trace(
+    data = readr::read_rds("previsao-sessoes-sites/tbl_sarima_quatrorodas.Rda"),
     x = ~.index,
     y = ~SARIMA,
     type = 'scatter', 
     mode = 'lines',
     name = str_c('SARIMA - MAPE: ',metrica_sarima_quatrorodas,"%"),
     text = ~paste('Ano semana: ',isoYearIsoWeek)
+  ) %>% 
+    plotly::add_trace(
+    data = readr::read_rds("previsao-modelos-ensemble/modelo_ensemble_quatrorodas.Rda"),
+    x = ~.index,
+    y = ~modelo_ensemble,
+    type = 'scatter',
+    mode = 'lines',
+    name = str_c('Ensemble - MAPE: ', metrica_ensemble_quatrorodas$MAPE_ensemble),
+    text = ~paste('Ano semana: ', isoYearIsoWeek)
   ) %>% 
   plotly::layout(
     legend = list(orientation = "h",   #mostrar entradas horizontalmente
@@ -755,14 +1053,24 @@ readr::read_rds("previsao-sessoes-sites/tbl_previsao_quatrorodas.Rda") %>%
 
 ### 5. Site Saúde
 
-#### 5.1 Gráfico Série Temporal
+#### 5.1 Gráfico da série temporal
+
+A série de Saúde apresentou uma mudança de nível brusca em meados de maio de 2019, motivada pelo recebimento do Google Trusted (uma espécie de selo que legitima a confiabilidade do site). Além disso, verifica-se a presença de outliers bem concentrados no período de março de 2020 até 14/09/2020, correspondendo à intensidade de matérias sobre o tema COVID-19.
 
 ```{r}
 readr::read_rds("dados_p_graficos/base_saude.Rda") %>% 
   fun_plot_ts()
 ```
 
-#### 5.2 Gráfico Decomposição Temporal
+#### 5.2 Gráfico da decomposição temporal
+
+A série não apresenta sazonalidade significativa.
+
+*Variação anual do total de sessões*:
+
+* 2017-2018: +132,8%
+* 2018-2019: +71%
+* 2019-2020: +10,6%
 
 ```{r}
 decomposicao_temporal_saude <- readr::read_rds("decomposicao_temporal/decomposicao_temporal_saude.Rda")
@@ -813,10 +1121,27 @@ g4 <- plotly::plot_ly(
   text = ~paste('Ano semana: ',isoYearIsoWeek)
 )
 
-plotly::subplot(g1, g2, g3, g4, nrows = 4)
+plotly::subplot(g1, g2, g3, g4, nrows = 4, shareX = T)
 ```
 
-#### 5.3 Gráfico da Quebra estrutural
+
+```{r, eval = F}
+readr::read_rds("dados_p_graficos/base_saude.Rda") %>% 
+  mutate(ano = lubridate::year(x)) %>% 
+  group_by(ano) %>% 
+  summarise(y_sessoes = sum(y)) %>% 
+  mutate(lag_sessoes = lag(y_sessoes, 1),
+         divisao = 100*(y_sessoes/lag_sessoes)-100)
+```
+
+#### 5.3 Gráfico de quebra estrutural
+
+A série apresentou três quebras estruturais significativas.
+
+* A primeira ocorrendo na semana 02 de 2018, ocasionando um crescimento de 127% em relação à basal anterior. 
+* A segunda ocorrendo na semana 12 de 2019, apresentando um crescimento de 93% em relação à basal anterior.
+* A terceira ocorrendo na semana 09 de 2020, apresentando um crescimento de 49% em relação à basal anterior.
+
 
 ```{r}
 base_saude <- readr::read_rds("dados_p_graficos/base_saude.Rda")
@@ -864,7 +1189,31 @@ base_saude %>%
 ```
 
 
+```{r, eval = F}
+#Variação na quebra estrutural
+base_saude %>% 
+  dplyr::left_join(
+    ano_semana %>% dplyr::rename(x = data),
+    by = c("x")
+  ) %>% 
+  dplyr::mutate(break_point = fun_break_point(ts_saude)) %>% 
+  dplyr::group_by(break_point) %>% 
+  dplyr::summarise(media_y = mean(y)) %>% 
+  dplyr::mutate(y_lag = dplyr::lag(media_y, 1),
+                divisao = 100*round(media_y/y_lag-1,2)) %>% 
+  stats::na.omit()
+```
+
 #### 5.4 Gráfico com os resultados de previsão
+
+Considerou-se a métrica MAPE (erro absoluto percentual médio) como critério de avaliação dentro dos dados de validação.
+
+Por ordem, tivemos os seguintes *MAPEs*:
+
+* SARIMA - 21,5%
+* Ensemble - 21,5%
+* Prophet - 24,5%
+* ETS com 28,2%
 
 ```{r}
 metrica_ets_prophet_saude <- 
@@ -875,6 +1224,10 @@ metrica_sarima_saude <- readr::read_rds(
   "metricas-previsao-sessoes-sites/metricas_previsao_sarima_saude.Rda") %>% 
   dplyr::select(mape) %>% 
   as.numeric() %>% 
+  round(digits = 3)*100
+
+metrica_ensemble_saude <- readr::read_rds("previsao-modelos-ensemble/modelo_ensemble_saude.Rda") %>% 
+  dplyr::distinct(MAPE_ensemble) %>% 
   round(digits = 3)*100
 
 ################################################################################
@@ -909,12 +1262,22 @@ readr::read_rds("previsao-sessoes-sites/tbl_previsao_saude.Rda") %>%
     text = ~paste('Ano semana: ',isoYearIsoWeek)
   ) %>% 
     plotly::add_trace(
+    data = readr::read_rds("previsao-sessoes-sites/tbl_sarima_saude.Rda"),
     x = ~.index,
     y = ~SARIMA,
     type = 'scatter', 
     mode = 'lines',
     name = str_c('SARIMA - MAPE: ',metrica_sarima_saude,"%"),
     text = ~paste('Ano semana: ',isoYearIsoWeek)
+  ) %>% 
+    plotly::add_trace(
+    data = readr::read_rds("previsao-modelos-ensemble/modelo_ensemble_saude.Rda"),
+    x = ~.index,
+    y = ~modelo_ensemble,
+    type = 'scatter',
+    mode = 'lines',
+    name = str_c('Ensemble - MAPE: ', metrica_ensemble_saude$MAPE_ensemble),
+    text = ~paste('Ano semana: ', isoYearIsoWeek)
   ) %>% 
   plotly::layout(
     legend = list(orientation = "h",   #mostrar entradas horizontalmente
@@ -927,13 +1290,28 @@ readr::read_rds("previsao-sessoes-sites/tbl_previsao_saude.Rda") %>%
 
 ### 6. Site Superinteressante
 
-#### 6.1 Gráfico Série Temporal
+#### 6.1 Gráfico da série temporal
+
+A série apresentou Houve um aumento da basal, dobrando de patamar.
+
+A série do site Superinteressante apresentou uma mudança brusca da basal em meados de julho de 2018, o que é explicado pela incorporação da Revista Mundo Estranho ao conteúdo do site. Além disso, há a presença de outliers concentrados no período de março a abril de 2020, motivado pela intensidade de matérias sobre tema COVID-19.
+
 ```{r}
 readr::read_rds("dados_p_graficos/base_superinteressante.Rda") %>% 
   fun_plot_ts()
 ```
 
-#### 6.2 Gráfico Decomposição Temporal
+#### 6.2 Gráfico da decomposição temporal
+
+A série apresentou um comportamento estável entre o ano de 2015 até meio do ano de 2018, apresentando uma tendência de crescimento logo depois. É uma série que não apresenta sazonalidade significativa.
+
+*Variação anual do total de sessões*:
+
+* 2015-2016: +21%
+* 2016-2017: -7,6%
+* 2017-2018: +42,4%
+* 2018-2019: +41,8%
+* 2019-2020: -25,8%
 
 ```{r}
 decomposicao_temporal_superinteressante <- readr::read_rds("decomposicao_temporal/decomposicao_temporal_superinteressante.Rda")
@@ -984,10 +1362,24 @@ g4 <- plotly::plot_ly(
   text = ~paste('Ano semana: ',isoYearIsoWeek)
 )
 
-plotly::subplot(g1, g2, g3, g4, nrows = 4)
+plotly::subplot(g1, g2, g3, g4, nrows = 4, shareX = T)
 ```
 
-#### 6.3 Gráfico da Quebra estrutural
+```{r, eval = F}
+readr::read_rds("dados_p_graficos/base_superinteressante.Rda") %>% 
+  mutate(ano = lubridate::year(x)) %>% 
+  group_by(ano) %>% 
+  summarise(y_sessoes = sum(y)) %>% 
+  mutate(lag_sessoes = lag(y_sessoes, 1),
+         divisao = 100*(y_sessoes/lag_sessoes)-100)
+```
+
+#### 6.3 Gráfico de quebra estrutural
+
+A série apresentou duas quebras estruturais significativas.
+
+* A primeira ocorrendo na semana 13 de 2016, ocasionando um crescimento de 18% em relação à basal anterior. 
+* A segunda ocorrendo na semana 33 de 2018, apresentando um crescimento de 91% em relação à basal anterior.
 
 ```{r}
 base_superinteressante <- readr::read_rds("dados_p_graficos/base_superinteressante.Rda")
@@ -1035,7 +1427,29 @@ base_superinteressante %>%
 ```
 
 
+```{r, eval = F}
+#Variação na quebra estrutural
+base_superinteressante %>% 
+  dplyr::left_join(
+    ano_semana %>% dplyr::rename(x = data),
+    by = c("x")
+  ) %>% 
+  dplyr::mutate(break_point = fun_break_point(ts_superinteressante)) %>% 
+  dplyr::group_by(break_point) %>% 
+  dplyr::summarise(media_y = mean(y)) %>% 
+  dplyr::mutate(y_lag = dplyr::lag(media_y, 1),
+                divisao = 100*round(media_y/y_lag-1,2)) %>% 
+  stats::na.omit()
+```
+
 #### 6.4 Gráfico com os resultados de previsão
+
+Por ordem, tivemos os seguintes *MAPEs*:
+
+* SARIMA - 23,3%
+* Ensemble - 23,4%
+* ETS com 23,8%
+* Prophet - 33,6%
 
 ```{r}
 metrica_ets_prophet_superinteressante <- 
@@ -1046,6 +1460,10 @@ metrica_sarima_superinteressante <- readr::read_rds(
   "metricas-previsao-sessoes-sites/metricas_previsao_sarima_superinteressante.Rda") %>% 
   dplyr::select(mape) %>% 
   as.numeric() %>% 
+  round(digits = 3)*100
+
+metrica_ensemble_superinteressante <- readr::read_rds("previsao-modelos-ensemble/modelo_ensemble_superinteressante.Rda") %>% 
+  dplyr::distinct(MAPE_ensemble) %>% 
   round(digits = 3)*100
 
 ################################################################################
@@ -1079,13 +1497,23 @@ readr::read_rds("previsao-sessoes-sites/tbl_previsao_superinteressante.Rda") %>%
     name = str_c('ETS - MAPE: ',round(metrica_ets_prophet_superinteressante[1,5]$mape,1),"%"),
     text = ~paste('Ano semana: ',isoYearIsoWeek)
   ) %>% 
-      plotly::add_trace(
+    plotly::add_trace(
+    data = readr::read_rds("previsao-sessoes-sites/tbl_sarima_superinteressante.Rda"),
     x = ~.index,
     y = ~SARIMA,
     type = 'scatter', 
     mode = 'lines',
     name = str_c('SARIMA - MAPE: ',metrica_sarima_superinteressante,"%"),
     text = ~paste('Ano semana: ',isoYearIsoWeek)
+  ) %>% 
+    plotly::add_trace(
+    data = readr::read_rds("previsao-modelos-ensemble/modelo_ensemble_superinteressante.Rda"),
+    x = ~.index,
+    y = ~modelo_ensemble,
+    type = 'scatter',
+    mode = 'lines',
+    name = str_c('Ensemble - MAPE: ', metrica_ensemble_superinteressante$MAPE_ensemble),
+    text = ~paste('Ano semana: ', isoYearIsoWeek)
   ) %>% 
   plotly::layout(
     legend = list(orientation = "h",   #mostrar entradas horizontalmente
@@ -1099,14 +1527,26 @@ readr::read_rds("previsao-sessoes-sites/tbl_previsao_superinteressante.Rda") %>%
 
 ### 7. Site Veja
 
-#### 7.1 Gráfico Série Temporal 
+A série do site Veja apresentou outliers em outubro de 2018 (referentes à temas políticos) e entre março/abril de 2020 com temas envolvendo COVID-19.
+
+A partir de agosto de 2016 a série apresentou uma tendência de crescimento, alcançando uma basal de 10M de sessões por semana.
+
+#### 7.1 Gráfico da série temporal 
 
 ```{r}
 readr::read_rds("dados_p_graficos/base_veja.Rda") %>% 
   fun_plot_ts()
 ```
 
-#### 7.2 Gráfico Decomposição Temporal
+#### 7.2 Gráfico da decomposição temporal
+
+Variação anual do total de sessões:
+
+* 2015-2016: +22,8%
+* 2016-2017: +17,5%
+* 2017-2018: +9%
+* 2018-2019: -16,6%
+* 2019-2020: -15,4%
 
 ```{r}
 decomposicao_temporal_veja <- readr::read_rds("decomposicao_temporal/decomposicao_temporal_veja.Rda")
@@ -1157,10 +1597,22 @@ g4 <- plotly::plot_ly(
   text = ~paste('Ano semana: ',isoYearIsoWeek)
 )
 
-plotly::subplot(g1, g2, g3, g4, nrows = 4)
+plotly::subplot(g1, g2, g3, g4, nrows = 4, shareX = T)
 ```
 
-#### 7.3 Gráfico da Quebra estrutural
+
+```{r, eval = F}
+readr::read_rds("dados_p_graficos/base_veja.Rda") %>% 
+  mutate(ano = lubridate::year(x)) %>% 
+  group_by(ano) %>% 
+  summarise(y_sessoes = sum(y)) %>% 
+  mutate(lag_sessoes = lag(y_sessoes, 1),
+         divisao = 100*(y_sessoes/lag_sessoes)-100)
+```
+
+#### 7.3 Gráfico de quebra estrutural
+
+A série apresentou apenas uma quebra estrutural a partir da semana 32 de 2016, ocasionando um crescimento de 45% em relação à basal anterior. 
 
 ```{r}
 base_veja <- readr::read_rds("dados_p_graficos/base_veja.Rda")
@@ -1208,7 +1660,29 @@ base_veja %>%
 ```
 
 
+```{r, eval = F}
+#Variação na quebra estrutural
+base_veja %>% 
+  dplyr::left_join(
+    ano_semana %>% dplyr::rename(x = data),
+    by = c("x")
+  ) %>% 
+  dplyr::mutate(break_point = fun_break_point(ts_veja)) %>% 
+  dplyr::group_by(break_point) %>% 
+  dplyr::summarise(media_y = mean(y)) %>% 
+  dplyr::mutate(y_lag = dplyr::lag(media_y, 1),
+                divisao = 100*round(media_y/y_lag-1,2)) %>% 
+  stats::na.omit()
+```
+
 #### 7.4 Gráfico com os resultados de previsão
+
+Por ordem, tivemos os seguintes *MAPEs*:
+
+* ETS - 29,2%
+* Ensemble - 29,3%
+* Prophet - 31,1%
+* SARIMA - 31,3%
 
 ```{r}
 metrica_ets_prophet_veja <- 
@@ -1219,6 +1693,10 @@ metrica_sarima_veja <- readr::read_rds(
   "metricas-previsao-sessoes-sites/metricas_previsao_sarima_veja.Rda") %>% 
   dplyr::select(mape) %>% 
   as.numeric() %>% 
+  round(digits = 3)*100
+
+metrica_ensemble_veja <- readr::read_rds("previsao-modelos-ensemble/modelo_ensemble_veja.Rda") %>% 
+  dplyr::distinct(MAPE_ensemble) %>% 
   round(digits = 3)*100
 
 ################################################################################
@@ -1252,13 +1730,23 @@ readr::read_rds("previsao-sessoes-sites/tbl_previsao_veja.Rda") %>%
     name = str_c('ETS- MAPE: ',round(metrica_ets_prophet_veja[1,5]$mape,1),"%"),
     text = ~paste('Ano semana: ',isoYearIsoWeek)
   ) %>% 
-      plotly::add_trace(
+    plotly::add_trace(
+    data = readr::read_rds("previsao-sessoes-sites/tbl_sarima_veja.Rda"),
     x = ~.index,
     y = ~SARIMA,
     type = 'scatter', 
     mode = 'lines',
     name = str_c('SARIMA - MAPE: ',metrica_sarima_veja,"%"),
     text = ~paste('Ano semana: ',isoYearIsoWeek)
+  ) %>% 
+    plotly::add_trace(
+    data = readr::read_rds("previsao-modelos-ensemble/modelo_ensemble_veja.Rda"),
+    x = ~.index,
+    y = ~modelo_ensemble,
+    type = 'scatter',
+    mode = 'lines',
+    name = str_c('Ensemble - MAPE: ', metrica_ensemble_veja$MAPE_ensemble),
+    text = ~paste('Ano semana: ', isoYearIsoWeek)
   ) %>% 
   plotly::layout(
     legend = list(orientation = "h",   #mostrar entradas horizontalmente
@@ -1270,16 +1758,23 @@ readr::read_rds("previsao-sessoes-sites/tbl_previsao_veja.Rda") %>%
 ```
 
 
-### 8. Site Claudia (Com Parceiros)
+### 8. Site Claudia (sem parceiros)
 
-#### 8.1 Gráfico Série Temporal
+#### 8.1 Gráfico da série temporal
+
+A série do site Claudia (sem parceiros) apresenta outliers de matérias com temas específicos. Além disso, a série indica muitas quebras estruturais, o que será visto adiante.
+
 ```{r}
 readr::read_rds("dados_p_graficos/base_claudia.Rda") %>% 
   fun_plot_ts()
 ```
 
 
-#### 8.2 Gráfico Decomposição Temporal
+#### 8.2 Gráfico da decomposição temporal
+
+* 2017-2018: +19,8%
+* 2018-2019: +16%
+* 2019-2020: -66,2%
 
 ```{r}
 decomposicao_temporal_claudia <- readr::read_rds("decomposicao_temporal/decomposicao_temporal_claudia.Rda")
@@ -1330,10 +1825,27 @@ g4 <- plotly::plot_ly(
   text = ~paste('Ano semana: ',isoYearIsoWeek)
 )
 
-plotly::subplot(g1, g2, g3, g4, nrows = 4)
+plotly::subplot(g1, g2, g3, g4, nrows = 4, shareX = T)
 ```
 
-#### 8.3 Gráfico da Quebra estrutural
+
+```{r, eval = F}
+readr::read_rds("dados_p_graficos/base_claudia.Rda") %>% 
+  mutate(ano = lubridate::year(x)) %>% 
+  group_by(ano) %>% 
+  summarise(y_sessoes = sum(y)) %>% 
+  mutate(lag_sessoes = lag(y_sessoes, 1),
+         divisao = 100*(y_sessoes/lag_sessoes)-100)
+```
+
+#### 8.3 Gráfico de quebra estrutural
+
+A série apresentou quatro quebras estruturais significativas.
+
+* A primeira ocorrendo na semana 51 de 2017, ocasionando um crescimento de 34% em relação à basal anterior. 
+* A segunda ocorrendo na semana 29 de 2018, apresentando uma queda de 23% em relação à basal anterior.
+* A terceira ocorrendo na semana 18 de 2019, apresentando um crescimento de 50% em relação à basal anterior.
+* A quarta ocorrendo na semana 02 de 2020, apresentando uma queda de 57% em relação à basal anterior.
 
 ```{r}
 base_claudia <- readr::read_rds("dados_p_graficos/base_claudia.Rda")
@@ -1381,7 +1893,28 @@ base_claudia %>%
 ```
 
 
+```{r, eval = F}
+#Variação na quebra estrutural
+base_claudia %>% 
+  dplyr::left_join(
+    ano_semana %>% dplyr::rename(x = data),
+    by = c("x")
+  ) %>% 
+  dplyr::mutate(break_point = fun_break_point(ts_claudia)) %>% 
+  dplyr::group_by(break_point) %>% 
+  dplyr::summarise(media_y = mean(y)) %>% 
+  dplyr::mutate(y_lag = dplyr::lag(media_y, 1),
+                divisao = 100*round(media_y/y_lag-1,2)) %>% 
+  stats::na.omit()
+```
+
 #### 8.4 Gráfico com os resultados de previsão
+
+Por ordem, tivemos os seguintes *MAPEs*:
+
+* SARIMA - 42%
+* Ensemble - 43,5%
+* ETS - 76,9%
 
 ```{r}
 metrica_ets_prophet_claudia <- 
@@ -1392,6 +1925,10 @@ metrica_sarima_claudia <- readr::read_rds(
   "metricas-previsao-sessoes-sites/metricas_previsao_sarima_claudia.Rda") %>% 
   dplyr::select(mape) %>% 
   as.numeric() %>% 
+  round(digits = 3)*100
+
+metrica_ensemble_claudia <- readr::read_rds("previsao-modelos-ensemble/modelo_ensemble_claudia.Rda") %>% 
+  dplyr::distinct(MAPE_ensemble) %>% 
   round(digits = 3)*100
 
 ################################################################################
@@ -1407,16 +1944,16 @@ readr::read_rds("previsao-sessoes-sites/tbl_previsao_claudia.Rda") %>%
     text = ~paste('Ano semana: ',isoYearIsoWeek)
     
   ) %>% 
-  plotly::add_trace(
-    
-    x = ~.index,
-    y = ~PROPHET,
-    type = 'scatter', 
-    mode = 'lines',
-    name = str_c('Prophet - MAPE: ',round(metrica_ets_prophet_claudia[2,5]$mape,1),"%"),
-    text = ~paste('Ano semana: ',isoYearIsoWeek)
-    
-  ) %>% 
+  #plotly::add_trace(
+  #  
+  #  x = ~.index,
+  #  y = ~PROPHET,
+  #  type = 'scatter', 
+  #  mode = 'lines',
+  #  name = str_c('Prophet - MAPE: ',round(metrica_ets_prophet_claudia[2,5]$mape,1),"%"),
+  #  text = ~paste('Ano semana: ',isoYearIsoWeek)
+  #  
+  #) %>% 
   plotly::add_trace(
     x = ~.index,
     y = ~`ETS(M,N,N)`,
@@ -1425,13 +1962,23 @@ readr::read_rds("previsao-sessoes-sites/tbl_previsao_claudia.Rda") %>%
     name = str_c('ETS - MAPE: ',round(metrica_ets_prophet_claudia[1,5]$mape,1),"%"),
     text = ~paste('Ano semana: ',isoYearIsoWeek)
   ) %>% 
-      plotly::add_trace(
+  plotly::add_trace(
+  data = readr::read_rds("previsao-sessoes-sites/tbl_sarima_claudia.Rda"),
     x = ~.index,
     y = ~SARIMA,
     type = 'scatter', 
     mode = 'lines',
     name = str_c('SARIMA - MAPE: ',metrica_sarima_claudia,"%"),
     text = ~paste('Ano semana: ',isoYearIsoWeek)
+  ) %>% 
+    plotly::add_trace(
+    data = readr::read_rds("previsao-modelos-ensemble/modelo_ensemble_claudia.Rda"),
+    x = ~.index,
+    y = ~modelo_ensemble,
+    type = 'scatter',
+    mode = 'lines',
+    name = str_c('Ensemble - MAPE: ', metrica_ensemble_claudia$MAPE_ensemble,"%"),
+    text = ~paste('Ano semana: ', isoYearIsoWeek)
   ) %>% 
   plotly::layout(
     legend = list(orientation = "h",   #mostrar entradas horizontalmente

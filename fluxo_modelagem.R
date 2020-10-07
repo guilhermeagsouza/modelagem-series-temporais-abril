@@ -1,0 +1,61 @@
+#Fluxo do processo de modelagem
+
+# Executa os modelos ETS e Prophet
+source("0.3.modelo_ets_prophet.R")
+rm(list=ls())
+
+# Executa os modelos SARIMA com as modelagens já feitas
+source("1.1.modelo_sarima_boaforma.R")
+rm(list=ls())
+source("1.2.modelo_sarima_capricho.R")
+rm(list=ls())
+source("1.3.modelo_sarima_guiadoestudante.R")
+rm(list=ls())
+source("1.4.modelo_sarima_quatrorodas.R")
+rm(list=ls())
+source("1.5.modelo_sarima_saude.R")
+rm(list=ls())
+source("1.6.modelo_sarima_superinteressante.R")
+rm(list=ls())
+source("1.7.modelo_sarima_veja.R")
+rm(list=ls())
+source("1.8.modelo_sarima_claudia.R")
+rm(list=ls())
+
+# Execução dos modelos Ensemble
+source("1.09.modelo_ensemble_boaforma.R")
+rm(list=ls())
+source("1.10.modelo_ensemble_capricho.R")
+rm(list=ls())
+source("1.11.modelo_ensemble_guiadoestudante.R")
+rm(list=ls())
+source("1.12.modelo_ensemble_quatrorodas.R")
+rm(list=ls())
+source("1.13.modelo_ensemble_saude.R")
+rm(list=ls())
+source("1.14.modelo_ensemble_superinteressante.R")
+rm(list=ls())
+source("1.15.modelo_ensemble_veja.R")
+rm(list=ls())
+source("1.16.modelo_ensemble_claudia.R")
+rm(list=ls())
+
+# Tabela de previsão consolidada
+source("5.1.tabela_previsao_consolidada_boaforma.R")
+rm(list=ls())
+source("5.2.tabela_previsao_consolidada_capricho.R")
+rm(list=ls())
+source("5.3.tabela_previsao_consolidada_guiadoestudante.R")
+rm(list=ls())
+source("5.4.tabela_previsao_consolidada_quatrorodas.R")
+rm(list=ls())
+source("5.5.tabela_previsao_consolidada_saude.R")
+rm(list=ls())
+source("5.6.tabela_previsao_consolidada_superinteressante.R")
+rm(list=ls())
+source("5.7.tabela_previsao_consolidada_veja.R")
+rm(list=ls())
+source("5.8.tabela_previsao_consolidada_claudia.R")
+rm(list=ls())
+
+#Os dados estão na pasta_previsao_consolidada
