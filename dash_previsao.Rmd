@@ -1,0 +1,1379 @@
+---
+title: "Forecasting 2021"
+author: "Analytics"
+output: 
+  flexdashboard::flex_dashboard:
+    orientation: rows
+---
+
+```{r setup, include=FALSE}
+library(flexdashboard)
+
+library(anomalize)
+library(plotly)
+library(strucchange)
+library(tidyverse)
+
+source("chart/prep_data/fun_prep_df_point.R", encoding = 'UTF-8')
+source("chart/prep_data/fun_basal.R", encoding = 'UTF-8')
+source("chart/prep_data/fun_prep_df_month.R", encoding = 'UTF-8')
+source("chart/prep_data/fun_prep_df_ma.R", encoding = 'UTF-8')
+source("chart/prep_data/fun_prep_df_loess.R", encoding = 'UTF-8')
+source("chart/fun_plot_ts.R", encoding = 'UTF-8')
+source("chart/prep_data/fun_calc_coord_polygon.R", encoding = 'UTF-8')
+source("chart/fun_plot_col.R", encoding = "UTF-8")
+source("chart/prep_data/fun_break_point.R", encoding = "UTF-8")
+
+```
+
+Boa Forma
+=======================================================================
+
+Row
+-----------------------------------------------------------------------
+
+### Insights
+
+Texto1
+
+Texto2
+
+Texto3
+
+Texto4
+
+Texto5
+
+Texto6
+
+Texto7
+
+Texto8
+
+Texto9
+
+Texto10
+
+Texto11
+
+Texto12
+
+Texto13
+
+Texto14
+
+Texto15
+
+Texto16
+
+
+
+### Sessões
+
+```{r}
+readr::read_rds("dados_p_graficos/base_boaforma.Rda") %>% 
+  fun_plot_ts()
+```
+
+
+
+
+Row
+-----------------------------------------------------------------------
+
+### Tendência
+
+```{r}
+decomposicao_temporal_boaforma <- readr::read_rds("decomposicao_temporal/decomposicao_temporal_boaforma.Rda")
+
+df_decomp_boaforma <- decomposicao_temporal_boaforma %>%
+  tibble::as_tibble() %>%
+  dplyr::select(x = data, y = Tendencia) %>%
+  dplyr::mutate(
+    x_tooltip = x %>% format("%d %b %y"),
+    y_tooltip = y %>%
+      round(0) %>%
+      format(nsmall = 0, big.mark = " ") %>%
+      stringr::str_trim() %>%
+      stringr::str_remove("NA"),
+    x = highcharter::datetime_to_timestamp(x)
+  )
+
+
+highcharter::highchart() %>%
+  highcharter::hc_add_series(
+    data = df_decomp_boaforma,
+    name = "Tendência",
+    type = "line",
+    color = "#305973",
+    highcharter::hcaes(x = x, y = y),
+    marker = list(symbol = "circle", radius = 3),
+    tooltip = list(
+      headerFormat = "",
+      pointFormat  = "{point.x_tooltip}<br><b>{point.y_tooltip}</b>"
+      )
+  ) %>%
+  highcharter::hc_xAxis(
+    type     = "datetime",
+    crosshair = TRUE
+  )
+```
+
+
+
+### Previsão (30 passos a frente)
+
+```{r}
+df_forecast_full <- readr::read_rds("tabela_previsao_consolidada/tbl_previsao_consolidada_boaforma.Rda")
+
+
+
+
+
+
+metrica_ets_prophet_boaforma <- 
+  readr::read_rds(
+    "metricas-previsao-sessoes-sites/metricas_previsao_boaforma.Rda")
+
+metrica_sarima_boaforma <- readr::read_rds(
+  "metricas-previsao-sessoes-sites/metricas_previsao_sarima_boaforma.Rda") %>% 
+  dplyr::select(mape) %>% 
+  as.numeric() %>% 
+  round(digits = 3)*100
+
+metrica_ensemble_boaforma <- readr::read_rds("previsao-modelos-ensemble/modelo_ensemble_boaforma.Rda") %>% 
+  dplyr::distinct(MAPE_ensemble) %>% 
+  round(digits = 3)*100
+
+################################################################################
+
+df_forecast_full <- readr::read_rds("tabela_previsao_consolidada/tbl_previsao_consolidada_boaforma.Rda")
+df_forecast_full <- df_forecast_full %>%
+  tibble::as_tibble()
+
+
+df_forecast_plot <- df_forecast_full %>%
+  dplyr::filter(!is.na(ETS)) %>%
+  tidyr::pivot_longer(
+    cols = c(ATUAL, ETS, SARIMA, PROPHET, ENSEMBLE),
+    names_to = "serie",
+    values_to = "valor"
+  ) %>%
+  dplyr::filter(!is.na(valor)) %>%
+  dplyr::rename(x = `.index`, y = valor) %>%
+  dplyr::mutate(
+    x_tooltip = x %>% format("%d %b %y"),
+    y_tooltip = y %>% round(0) %>% format(nsmall = 0, big.mark = " "),
+    x = highcharter::datetime_to_timestamp(x)
+  )
+
+
+
+highcharter::highchart() %>%
+  highcharter::hc_add_series(
+    data = df_forecast_plot,
+    # name = "Basal",
+    type = "line",
+    color = c(
+      highcharter::hex_to_rgba(x = "#5bae93", 1),
+      highcharter::hex_to_rgba(x = "#FF9996", 1),
+      highcharter::hex_to_rgba(x = "#FF9996", 1),
+      highcharter::hex_to_rgba(x = "#FF9996", 1),
+      highcharter::hex_to_rgba(x = "#FF9996", 1)
+    ),
+    highcharter::hcaes(x = x, y = y, group = serie),
+    marker = list(symbol = "circle", radius = 3),
+    tooltip = list(
+      headerFormat = "",
+      pointFormat  = "{point.x_tooltip}<br><b>{point.y_tooltip}</b>"
+    )
+  ) %>%
+  highcharter::hc_xAxis(
+    type     = "datetime",
+    crosshair = TRUE
+  )
+```
+
+
+Capricho
+=======================================================================
+
+Row
+-----------------------------------------------------------------------
+
+### Insights
+
+Texto1
+
+Texto2
+
+Texto3
+
+Texto4
+
+Texto5
+
+Texto6
+
+Texto7
+
+Texto8
+
+Texto9
+
+Texto10
+
+Texto11
+
+Texto12
+
+Texto13
+
+Texto14
+
+Texto15
+
+Texto16
+
+
+
+### Sessões
+
+```{r}
+readr::read_rds("dados_p_graficos/base_capricho.Rda") %>% 
+  fun_plot_ts()
+```
+
+
+
+
+Row
+-----------------------------------------------------------------------
+
+### Tendência
+
+```{r}
+decomposicao_temporal_capricho <- readr::read_rds("decomposicao_temporal/decomposicao_temporal_capricho.Rda")
+
+df_decomp_capricho <- decomposicao_temporal_capricho %>%
+  tibble::as_tibble() %>%
+  dplyr::select(x = data, y = Tendencia) %>%
+  dplyr::mutate(
+    x_tooltip = x %>% format("%d %b %y"),
+    y_tooltip = y %>%
+      round(0) %>%
+      format(nsmall = 0, big.mark = " ") %>%
+      stringr::str_trim() %>%
+      stringr::str_remove("NA"),
+    x = highcharter::datetime_to_timestamp(x)
+  )
+
+
+highcharter::highchart() %>%
+  highcharter::hc_add_series(
+    data = df_decomp_capricho,
+    name = "Tendência",
+    type = "line",
+    color = "#305973",
+    highcharter::hcaes(x = x, y = y),
+    marker = list(symbol = "circle", radius = 3),
+    tooltip = list(
+      headerFormat = "",
+      pointFormat  = "{point.x_tooltip}<br><b>{point.y_tooltip}</b>"
+      )
+  ) %>%
+  highcharter::hc_xAxis(
+    type     = "datetime",
+    crosshair = TRUE
+  )
+```
+
+
+
+### Previsão (30 passos a frente)
+
+```{r}
+df_forecast_full <- readr::read_rds("tabela_previsao_consolidada/tbl_previsao_consolidada_capricho.Rda")
+
+
+
+
+
+
+metrica_ets_prophet_capricho <- 
+  readr::read_rds(
+    "metricas-previsao-sessoes-sites/metricas_previsao_capricho.Rda")
+
+metrica_sarima_capricho <- readr::read_rds(
+  "metricas-previsao-sessoes-sites/metricas_previsao_sarima_capricho.Rda") %>% 
+  dplyr::select(mape) %>% 
+  as.numeric() %>% 
+  round(digits = 3)*100
+
+metrica_ensemble_capricho <- readr::read_rds("previsao-modelos-ensemble/modelo_ensemble_capricho.Rda") %>% 
+  dplyr::distinct(MAPE_ensemble) %>% 
+  round(digits = 3)*100
+
+################################################################################
+
+df_forecast_full <- readr::read_rds("tabela_previsao_consolidada/tbl_previsao_consolidada_capricho.Rda")
+df_forecast_full <- df_forecast_full %>%
+  tibble::as_tibble()
+
+
+df_forecast_plot <- df_forecast_full %>%
+  dplyr::filter(!is.na(ETS)) %>%
+  tidyr::pivot_longer(
+    cols = c(ATUAL, ETS, SARIMA, PROPHET, ENSEMBLE),
+    names_to = "serie",
+    values_to = "valor"
+  ) %>%
+  dplyr::filter(!is.na(valor)) %>%
+  dplyr::rename(x = `.index`, y = valor) %>%
+  dplyr::mutate(
+    x_tooltip = x %>% format("%d %b %y"),
+    y_tooltip = y %>% round(0) %>% format(nsmall = 0, big.mark = " "),
+    x = highcharter::datetime_to_timestamp(x)
+  )
+
+
+
+highcharter::highchart() %>%
+  highcharter::hc_add_series(
+    data = df_forecast_plot,
+    # name = "Basal",
+    type = "line",
+    color = c(
+      highcharter::hex_to_rgba(x = "#5bae93", 1),
+      highcharter::hex_to_rgba(x = "#FF9996", 1),
+      highcharter::hex_to_rgba(x = "#FF9996", 1),
+      highcharter::hex_to_rgba(x = "#FF9996", 1),
+      highcharter::hex_to_rgba(x = "#FF9996", 1)
+    ),
+    highcharter::hcaes(x = x, y = y, group = serie),
+    marker = list(symbol = "circle", radius = 3),
+    tooltip = list(
+      headerFormat = "",
+      pointFormat  = "{point.x_tooltip}<br><b>{point.y_tooltip}</b>"
+    )
+  ) %>%
+  highcharter::hc_xAxis(
+    type     = "datetime",
+    crosshair = TRUE
+  )
+```
+
+Guia do Estudante
+=======================================================================
+
+Row
+-----------------------------------------------------------------------
+
+### Insights
+
+Texto1
+
+Texto2
+
+Texto3
+
+Texto4
+
+Texto5
+
+Texto6
+
+Texto7
+
+Texto8
+
+Texto9
+
+Texto10
+
+Texto11
+
+Texto12
+
+Texto13
+
+Texto14
+
+Texto15
+
+Texto16
+
+
+
+### Sessões
+
+```{r}
+readr::read_rds("dados_p_graficos/base_guiadoestudante.Rda") %>% 
+  fun_plot_ts()
+```
+
+
+
+
+Row
+-----------------------------------------------------------------------
+
+### Tendência
+
+```{r}
+decomposicao_temporal_guiadoestudante <- readr::read_rds("decomposicao_temporal/decomposicao_temporal_guiadoestudante.Rda")
+
+df_decomp_guiadoestudante <- decomposicao_temporal_guiadoestudante %>%
+  tibble::as_tibble() %>%
+  dplyr::select(x = data, y = Tendencia) %>%
+  dplyr::mutate(
+    x_tooltip = x %>% format("%d %b %y"),
+    y_tooltip = y %>%
+      round(0) %>%
+      format(nsmall = 0, big.mark = " ") %>%
+      stringr::str_trim() %>%
+      stringr::str_remove("NA"),
+    x = highcharter::datetime_to_timestamp(x)
+  )
+
+
+highcharter::highchart() %>%
+  highcharter::hc_add_series(
+    data = df_decomp_guiadoestudante,
+    name = "Tendência",
+    type = "line",
+    color = "#305973",
+    highcharter::hcaes(x = x, y = y),
+    marker = list(symbol = "circle", radius = 3),
+    tooltip = list(
+      headerFormat = "",
+      pointFormat  = "{point.x_tooltip}<br><b>{point.y_tooltip}</b>"
+      )
+  ) %>%
+  highcharter::hc_xAxis(
+    type     = "datetime",
+    crosshair = TRUE
+  )
+```
+
+
+
+### Previsão (30 passos a frente)
+
+```{r}
+df_forecast_full <- readr::read_rds("tabela_previsao_consolidada/tbl_previsao_consolidada_guiadoestudante.Rda")
+
+
+
+
+
+
+metrica_ets_prophet_guiadoestudante <- 
+  readr::read_rds(
+    "metricas-previsao-sessoes-sites/metricas_previsao_guiadoestudante.Rda")
+
+metrica_sarima_guiadoestudante <- readr::read_rds(
+  "metricas-previsao-sessoes-sites/metricas_previsao_sarima_guiadoestudante.Rda") %>% 
+  dplyr::select(mape) %>% 
+  as.numeric() %>% 
+  round(digits = 3)*100
+
+metrica_ensemble_guiadoestudante <- readr::read_rds("previsao-modelos-ensemble/modelo_ensemble_guiadoestudante.Rda") %>% 
+  dplyr::distinct(MAPE_ensemble) %>% 
+  round(digits = 3)*100
+
+################################################################################
+
+df_forecast_full <- readr::read_rds("tabela_previsao_consolidada/tbl_previsao_consolidada_guiadoestudante.Rda")
+df_forecast_full <- df_forecast_full %>%
+  tibble::as_tibble()
+
+
+df_forecast_plot <- df_forecast_full %>%
+  dplyr::filter(!is.na(ETS)) %>%
+  tidyr::pivot_longer(
+    cols = c(ATUAL, ETS, SARIMA, PROPHET, ENSEMBLE),
+    names_to = "serie",
+    values_to = "valor"
+  ) %>%
+  dplyr::filter(!is.na(valor)) %>%
+  dplyr::rename(x = `.index`, y = valor) %>%
+  dplyr::mutate(
+    x_tooltip = x %>% format("%d %b %y"),
+    y_tooltip = y %>% round(0) %>% format(nsmall = 0, big.mark = " "),
+    x = highcharter::datetime_to_timestamp(x)
+  )
+
+
+
+highcharter::highchart() %>%
+  highcharter::hc_add_series(
+    data = df_forecast_plot,
+    # name = "Basal",
+    type = "line",
+    color = c(
+      highcharter::hex_to_rgba(x = "#5bae93", 1),
+      highcharter::hex_to_rgba(x = "#FF9996", 1),
+      highcharter::hex_to_rgba(x = "#FF9996", 1),
+      highcharter::hex_to_rgba(x = "#FF9996", 1),
+      highcharter::hex_to_rgba(x = "#FF9996", 1)
+    ),
+    highcharter::hcaes(x = x, y = y, group = serie),
+    marker = list(symbol = "circle", radius = 3),
+    tooltip = list(
+      headerFormat = "",
+      pointFormat  = "{point.x_tooltip}<br><b>{point.y_tooltip}</b>"
+    )
+  ) %>%
+  highcharter::hc_xAxis(
+    type     = "datetime",
+    crosshair = TRUE
+  )
+```
+
+
+Quatro Rodas
+=======================================================================
+
+Row
+-----------------------------------------------------------------------
+
+### Insights
+
+Texto1
+
+Texto2
+
+Texto3
+
+Texto4
+
+Texto5
+
+Texto6
+
+Texto7
+
+Texto8
+
+Texto9
+
+Texto10
+
+Texto11
+
+Texto12
+
+Texto13
+
+Texto14
+
+Texto15
+
+Texto16
+
+
+
+### Sessões
+
+```{r}
+readr::read_rds("dados_p_graficos/base_quatrorodas.Rda") %>% 
+  fun_plot_ts()
+```
+
+
+
+
+Row
+-----------------------------------------------------------------------
+
+### Tendência
+
+```{r}
+decomposicao_temporal_quatrorodas <- readr::read_rds("decomposicao_temporal/decomposicao_temporal_quatrorodas.Rda")
+
+df_decomp_quatrorodas <- decomposicao_temporal_quatrorodas %>%
+  tibble::as_tibble() %>%
+  dplyr::select(x = data, y = Tendencia) %>%
+  dplyr::mutate(
+    x_tooltip = x %>% format("%d %b %y"),
+    y_tooltip = y %>%
+      round(0) %>%
+      format(nsmall = 0, big.mark = " ") %>%
+      stringr::str_trim() %>%
+      stringr::str_remove("NA"),
+    x = highcharter::datetime_to_timestamp(x)
+  )
+
+
+highcharter::highchart() %>%
+  highcharter::hc_add_series(
+    data = df_decomp_quatrorodas,
+    name = "Tendência",
+    type = "line",
+    color = "#305973",
+    highcharter::hcaes(x = x, y = y),
+    marker = list(symbol = "circle", radius = 3),
+    tooltip = list(
+      headerFormat = "",
+      pointFormat  = "{point.x_tooltip}<br><b>{point.y_tooltip}</b>"
+      )
+  ) %>%
+  highcharter::hc_xAxis(
+    type     = "datetime",
+    crosshair = TRUE
+  )
+```
+
+
+
+### Previsão (30 passos a frente)
+
+```{r}
+df_forecast_full <- readr::read_rds("tabela_previsao_consolidada/tbl_previsao_consolidada_quatrorodas.Rda")
+
+
+
+
+
+
+metrica_ets_prophet_quatrorodas <- 
+  readr::read_rds(
+    "metricas-previsao-sessoes-sites/metricas_previsao_quatrorodas.Rda")
+
+metrica_sarima_quatrorodas <- readr::read_rds(
+  "metricas-previsao-sessoes-sites/metricas_previsao_sarima_quatrorodas.Rda") %>% 
+  dplyr::select(mape) %>% 
+  as.numeric() %>% 
+  round(digits = 3)*100
+
+metrica_ensemble_quatrorodas <- readr::read_rds("previsao-modelos-ensemble/modelo_ensemble_quatrorodas.Rda") %>% 
+  dplyr::distinct(MAPE_ensemble) %>% 
+  round(digits = 3)*100
+
+################################################################################
+
+df_forecast_full <- readr::read_rds("tabela_previsao_consolidada/tbl_previsao_consolidada_quatrorodas.Rda")
+df_forecast_full <- df_forecast_full %>%
+  tibble::as_tibble()
+
+
+df_forecast_plot <- df_forecast_full %>%
+  dplyr::filter(!is.na(ETS)) %>%
+  tidyr::pivot_longer(
+    cols = c(ATUAL, ETS, SARIMA, PROPHET, ENSEMBLE),
+    names_to = "serie",
+    values_to = "valor"
+  ) %>%
+  dplyr::filter(!is.na(valor)) %>%
+  dplyr::rename(x = `.index`, y = valor) %>%
+  dplyr::mutate(
+    x_tooltip = x %>% format("%d %b %y"),
+    y_tooltip = y %>% round(0) %>% format(nsmall = 0, big.mark = " "),
+    x = highcharter::datetime_to_timestamp(x)
+  )
+
+
+
+highcharter::highchart() %>%
+  highcharter::hc_add_series(
+    data = df_forecast_plot,
+    # name = "Basal",
+    type = "line",
+    color = c(
+      highcharter::hex_to_rgba(x = "#5bae93", 1),
+      highcharter::hex_to_rgba(x = "#FF9996", 1),
+      highcharter::hex_to_rgba(x = "#FF9996", 1),
+      highcharter::hex_to_rgba(x = "#FF9996", 1),
+      highcharter::hex_to_rgba(x = "#FF9996", 1)
+    ),
+    highcharter::hcaes(x = x, y = y, group = serie),
+    marker = list(symbol = "circle", radius = 3),
+    tooltip = list(
+      headerFormat = "",
+      pointFormat  = "{point.x_tooltip}<br><b>{point.y_tooltip}</b>"
+    )
+  ) %>%
+  highcharter::hc_xAxis(
+    type     = "datetime",
+    crosshair = TRUE
+  )
+```
+
+
+Saúde
+=======================================================================
+
+Row
+-----------------------------------------------------------------------
+
+### Insights
+
+Texto1
+
+Texto2
+
+Texto3
+
+Texto4
+
+Texto5
+
+Texto6
+
+Texto7
+
+Texto8
+
+Texto9
+
+Texto10
+
+Texto11
+
+Texto12
+
+Texto13
+
+Texto14
+
+Texto15
+
+Texto16
+
+
+
+### Sessões
+
+```{r}
+readr::read_rds("dados_p_graficos/base_saude.Rda") %>% 
+  fun_plot_ts()
+```
+
+
+
+
+Row
+-----------------------------------------------------------------------
+
+### Tendência
+
+```{r}
+decomposicao_temporal_saude <- readr::read_rds("decomposicao_temporal/decomposicao_temporal_saude.Rda")
+
+df_decomp_saude <- decomposicao_temporal_saude %>%
+  tibble::as_tibble() %>%
+  dplyr::select(x = data, y = Tendencia) %>%
+  dplyr::mutate(
+    x_tooltip = x %>% format("%d %b %y"),
+    y_tooltip = y %>%
+      round(0) %>%
+      format(nsmall = 0, big.mark = " ") %>%
+      stringr::str_trim() %>%
+      stringr::str_remove("NA"),
+    x = highcharter::datetime_to_timestamp(x)
+  )
+
+
+highcharter::highchart() %>%
+  highcharter::hc_add_series(
+    data = df_decomp_saude,
+    name = "Tendência",
+    type = "line",
+    color = "#305973",
+    highcharter::hcaes(x = x, y = y),
+    marker = list(symbol = "circle", radius = 3),
+    tooltip = list(
+      headerFormat = "",
+      pointFormat  = "{point.x_tooltip}<br><b>{point.y_tooltip}</b>"
+      )
+  ) %>%
+  highcharter::hc_xAxis(
+    type     = "datetime",
+    crosshair = TRUE
+  )
+```
+
+
+
+### Previsão (30 passos a frente)
+
+```{r}
+df_forecast_full <- readr::read_rds("tabela_previsao_consolidada/tbl_previsao_consolidada_saude.Rda")
+
+
+
+
+
+
+metrica_ets_prophet_saude <- 
+  readr::read_rds(
+    "metricas-previsao-sessoes-sites/metricas_previsao_saude.Rda")
+
+metrica_sarima_saude <- readr::read_rds(
+  "metricas-previsao-sessoes-sites/metricas_previsao_sarima_saude.Rda") %>% 
+  dplyr::select(mape) %>% 
+  as.numeric() %>% 
+  round(digits = 3)*100
+
+metrica_ensemble_saude <- readr::read_rds("previsao-modelos-ensemble/modelo_ensemble_saude.Rda") %>% 
+  dplyr::distinct(MAPE_ensemble) %>% 
+  round(digits = 3)*100
+
+################################################################################
+
+df_forecast_full <- readr::read_rds("tabela_previsao_consolidada/tbl_previsao_consolidada_saude.Rda")
+df_forecast_full <- df_forecast_full %>%
+  tibble::as_tibble()
+
+
+df_forecast_plot <- df_forecast_full %>%
+  dplyr::filter(!is.na(ETS)) %>%
+  tidyr::pivot_longer(
+    cols = c(ATUAL, ETS, SARIMA, PROPHET, ENSEMBLE),
+    names_to = "serie",
+    values_to = "valor"
+  ) %>%
+  dplyr::filter(!is.na(valor)) %>%
+  dplyr::rename(x = `.index`, y = valor) %>%
+  dplyr::mutate(
+    x_tooltip = x %>% format("%d %b %y"),
+    y_tooltip = y %>% round(0) %>% format(nsmall = 0, big.mark = " "),
+    x = highcharter::datetime_to_timestamp(x)
+  )
+
+
+
+highcharter::highchart() %>%
+  highcharter::hc_add_series(
+    data = df_forecast_plot,
+    # name = "Basal",
+    type = "line",
+    color = c(
+      highcharter::hex_to_rgba(x = "#5bae93", 1),
+      highcharter::hex_to_rgba(x = "#FF9996", 1),
+      highcharter::hex_to_rgba(x = "#FF9996", 1),
+      highcharter::hex_to_rgba(x = "#FF9996", 1),
+      highcharter::hex_to_rgba(x = "#FF9996", 1)
+    ),
+    highcharter::hcaes(x = x, y = y, group = serie),
+    marker = list(symbol = "circle", radius = 3),
+    tooltip = list(
+      headerFormat = "",
+      pointFormat  = "{point.x_tooltip}<br><b>{point.y_tooltip}</b>"
+    )
+  ) %>%
+  highcharter::hc_xAxis(
+    type     = "datetime",
+    crosshair = TRUE
+  )
+```
+
+
+Superinteressante
+=======================================================================
+
+Row
+-----------------------------------------------------------------------
+
+### Insights
+
+Texto1
+
+Texto2
+
+Texto3
+
+Texto4
+
+Texto5
+
+Texto6
+
+Texto7
+
+Texto8
+
+Texto9
+
+Texto10
+
+Texto11
+
+Texto12
+
+Texto13
+
+Texto14
+
+Texto15
+
+Texto16
+
+
+
+### Sessões
+
+```{r}
+readr::read_rds("dados_p_graficos/base_superinteressante.Rda") %>% 
+  fun_plot_ts()
+```
+
+
+
+
+Row
+-----------------------------------------------------------------------
+
+### Tendência
+
+```{r}
+decomposicao_temporal_superinteressante <- readr::read_rds("decomposicao_temporal/decomposicao_temporal_superinteressante.Rda")
+
+df_decomp_superinteressante <- decomposicao_temporal_superinteressante %>%
+  tibble::as_tibble() %>%
+  dplyr::select(x = data, y = Tendencia) %>%
+  dplyr::mutate(
+    x_tooltip = x %>% format("%d %b %y"),
+    y_tooltip = y %>%
+      round(0) %>%
+      format(nsmall = 0, big.mark = " ") %>%
+      stringr::str_trim() %>%
+      stringr::str_remove("NA"),
+    x = highcharter::datetime_to_timestamp(x)
+  )
+
+
+highcharter::highchart() %>%
+  highcharter::hc_add_series(
+    data = df_decomp_superinteressante,
+    name = "Tendência",
+    type = "line",
+    color = "#305973",
+    highcharter::hcaes(x = x, y = y),
+    marker = list(symbol = "circle", radius = 3),
+    tooltip = list(
+      headerFormat = "",
+      pointFormat  = "{point.x_tooltip}<br><b>{point.y_tooltip}</b>"
+      )
+  ) %>%
+  highcharter::hc_xAxis(
+    type     = "datetime",
+    crosshair = TRUE
+  )
+```
+
+
+
+### Previsão (30 passos a frente)
+
+```{r}
+df_forecast_full <- readr::read_rds("tabela_previsao_consolidada/tbl_previsao_consolidada_superinteressante.Rda")
+
+
+
+
+
+
+metrica_ets_prophet_superinteressante <- 
+  readr::read_rds(
+    "metricas-previsao-sessoes-sites/metricas_previsao_superinteressante.Rda")
+
+metrica_sarima_superinteressante <- readr::read_rds(
+  "metricas-previsao-sessoes-sites/metricas_previsao_sarima_superinteressante.Rda") %>% 
+  dplyr::select(mape) %>% 
+  as.numeric() %>% 
+  round(digits = 3)*100
+
+metrica_ensemble_superinteressante <- readr::read_rds("previsao-modelos-ensemble/modelo_ensemble_superinteressante.Rda") %>% 
+  dplyr::distinct(MAPE_ensemble) %>% 
+  round(digits = 3)*100
+
+################################################################################
+
+df_forecast_full <- readr::read_rds("tabela_previsao_consolidada/tbl_previsao_consolidada_superinteressante.Rda")
+df_forecast_full <- df_forecast_full %>%
+  tibble::as_tibble()
+
+
+df_forecast_plot <- df_forecast_full %>%
+  dplyr::filter(!is.na(ETS)) %>%
+  tidyr::pivot_longer(
+    cols = c(ATUAL, ETS, SARIMA, PROPHET, ENSEMBLE),
+    names_to = "serie",
+    values_to = "valor"
+  ) %>%
+  dplyr::filter(!is.na(valor)) %>%
+  dplyr::rename(x = `.index`, y = valor) %>%
+  dplyr::mutate(
+    x_tooltip = x %>% format("%d %b %y"),
+    y_tooltip = y %>% round(0) %>% format(nsmall = 0, big.mark = " "),
+    x = highcharter::datetime_to_timestamp(x)
+  )
+
+
+
+highcharter::highchart() %>%
+  highcharter::hc_add_series(
+    data = df_forecast_plot,
+    # name = "Basal",
+    type = "line",
+    color = c(
+      highcharter::hex_to_rgba(x = "#5bae93", 1),
+      highcharter::hex_to_rgba(x = "#FF9996", 1),
+      highcharter::hex_to_rgba(x = "#FF9996", 1),
+      highcharter::hex_to_rgba(x = "#FF9996", 1),
+      highcharter::hex_to_rgba(x = "#FF9996", 1)
+    ),
+    highcharter::hcaes(x = x, y = y, group = serie),
+    marker = list(symbol = "circle", radius = 3),
+    tooltip = list(
+      headerFormat = "",
+      pointFormat  = "{point.x_tooltip}<br><b>{point.y_tooltip}</b>"
+    )
+  ) %>%
+  highcharter::hc_xAxis(
+    type     = "datetime",
+    crosshair = TRUE
+  )
+```
+
+
+Veja
+=======================================================================
+
+Row
+-----------------------------------------------------------------------
+
+### Insights
+
+Texto1
+
+Texto2
+
+Texto3
+
+Texto4
+
+Texto5
+
+Texto6
+
+Texto7
+
+Texto8
+
+Texto9
+
+Texto10
+
+Texto11
+
+Texto12
+
+Texto13
+
+Texto14
+
+Texto15
+
+Texto16
+
+
+
+### Sessões
+
+```{r}
+readr::read_rds("dados_p_graficos/base_veja.Rda") %>% 
+  fun_plot_ts()
+```
+
+
+
+
+Row
+-----------------------------------------------------------------------
+
+### Tendência
+
+```{r}
+decomposicao_temporal_veja <- readr::read_rds("decomposicao_temporal/decomposicao_temporal_veja.Rda")
+
+df_decomp_veja <- decomposicao_temporal_veja %>%
+  tibble::as_tibble() %>%
+  dplyr::select(x = data, y = Tendencia) %>%
+  dplyr::mutate(
+    x_tooltip = x %>% format("%d %b %y"),
+    y_tooltip = y %>%
+      round(0) %>%
+      format(nsmall = 0, big.mark = " ") %>%
+      stringr::str_trim() %>%
+      stringr::str_remove("NA"),
+    x = highcharter::datetime_to_timestamp(x)
+  )
+
+
+highcharter::highchart() %>%
+  highcharter::hc_add_series(
+    data = df_decomp_veja,
+    name = "Tendência",
+    type = "line",
+    color = "#305973",
+    highcharter::hcaes(x = x, y = y),
+    marker = list(symbol = "circle", radius = 3),
+    tooltip = list(
+      headerFormat = "",
+      pointFormat  = "{point.x_tooltip}<br><b>{point.y_tooltip}</b>"
+      )
+  ) %>%
+  highcharter::hc_xAxis(
+    type     = "datetime",
+    crosshair = TRUE
+  )
+```
+
+
+
+### Previsão (30 passos a frente)
+
+```{r}
+df_forecast_full <- readr::read_rds("tabela_previsao_consolidada/tbl_previsao_consolidada_veja.Rda")
+
+
+
+
+
+
+metrica_ets_prophet_veja <- 
+  readr::read_rds(
+    "metricas-previsao-sessoes-sites/metricas_previsao_veja.Rda")
+
+metrica_sarima_veja <- readr::read_rds(
+  "metricas-previsao-sessoes-sites/metricas_previsao_sarima_veja.Rda") %>% 
+  dplyr::select(mape) %>% 
+  as.numeric() %>% 
+  round(digits = 3)*100
+
+metrica_ensemble_veja <- readr::read_rds("previsao-modelos-ensemble/modelo_ensemble_veja.Rda") %>% 
+  dplyr::distinct(MAPE_ensemble) %>% 
+  round(digits = 3)*100
+
+################################################################################
+
+df_forecast_full <- readr::read_rds("tabela_previsao_consolidada/tbl_previsao_consolidada_veja.Rda")
+df_forecast_full <- df_forecast_full %>%
+  tibble::as_tibble()
+
+
+df_forecast_plot <- df_forecast_full %>%
+  dplyr::filter(!is.na(ETS)) %>%
+  tidyr::pivot_longer(
+    cols = c(ATUAL, ETS, SARIMA, PROPHET, ENSEMBLE),
+    names_to = "serie",
+    values_to = "valor"
+  ) %>%
+  dplyr::filter(!is.na(valor)) %>%
+  dplyr::rename(x = `.index`, y = valor) %>%
+  dplyr::mutate(
+    x_tooltip = x %>% format("%d %b %y"),
+    y_tooltip = y %>% round(0) %>% format(nsmall = 0, big.mark = " "),
+    x = highcharter::datetime_to_timestamp(x)
+  )
+
+
+
+highcharter::highchart() %>%
+  highcharter::hc_add_series(
+    data = df_forecast_plot,
+    # name = "Basal",
+    type = "line",
+    color = c(
+      highcharter::hex_to_rgba(x = "#5bae93", 1),
+      highcharter::hex_to_rgba(x = "#FF9996", 1),
+      highcharter::hex_to_rgba(x = "#FF9996", 1),
+      highcharter::hex_to_rgba(x = "#FF9996", 1),
+      highcharter::hex_to_rgba(x = "#FF9996", 1)
+    ),
+    highcharter::hcaes(x = x, y = y, group = serie),
+    marker = list(symbol = "circle", radius = 3),
+    tooltip = list(
+      headerFormat = "",
+      pointFormat  = "{point.x_tooltip}<br><b>{point.y_tooltip}</b>"
+    )
+  ) %>%
+  highcharter::hc_xAxis(
+    type     = "datetime",
+    crosshair = TRUE
+  )
+```
+
+
+
+Claudia
+=======================================================================
+
+Row
+-----------------------------------------------------------------------
+
+### Insights
+
+Texto1
+
+Texto2
+
+Texto3
+
+Texto4
+
+Texto5
+
+Texto6
+
+Texto7
+
+Texto8
+
+Texto9
+
+Texto10
+
+Texto11
+
+Texto12
+
+Texto13
+
+Texto14
+
+Texto15
+
+Texto16
+
+
+
+### Sessões
+
+```{r}
+readr::read_rds("dados_p_graficos/base_claudia.Rda") %>% 
+  fun_plot_ts()
+```
+
+
+
+
+Row
+-----------------------------------------------------------------------
+
+### Tendência
+
+```{r}
+decomposicao_temporal_claudia <- readr::read_rds("decomposicao_temporal/decomposicao_temporal_claudia.Rda")
+
+df_decomp_claudia <- decomposicao_temporal_claudia %>%
+  tibble::as_tibble() %>%
+  dplyr::select(x = data, y = Tendencia) %>%
+  dplyr::mutate(
+    x_tooltip = x %>% format("%d %b %y"),
+    y_tooltip = y %>%
+      round(0) %>%
+      format(nsmall = 0, big.mark = " ") %>%
+      stringr::str_trim() %>%
+      stringr::str_remove("NA"),
+    x = highcharter::datetime_to_timestamp(x)
+  )
+
+
+highcharter::highchart() %>%
+  highcharter::hc_add_series(
+    data = df_decomp_claudia,
+    name = "Tendência",
+    type = "line",
+    color = "#305973",
+    highcharter::hcaes(x = x, y = y),
+    marker = list(symbol = "circle", radius = 3),
+    tooltip = list(
+      headerFormat = "",
+      pointFormat  = "{point.x_tooltip}<br><b>{point.y_tooltip}</b>"
+      )
+  ) %>%
+  highcharter::hc_xAxis(
+    type     = "datetime",
+    crosshair = TRUE
+  )
+```
+
+
+
+### Previsão (30 passos a frente)
+
+```{r}
+df_forecast_full <- readr::read_rds("tabela_previsao_consolidada/tbl_previsao_consolidada_claudia.Rda")
+
+
+
+
+
+
+metrica_ets_prophet_claudia <- 
+  readr::read_rds(
+    "metricas-previsao-sessoes-sites/metricas_previsao_claudia.Rda")
+
+metrica_sarima_claudia <- readr::read_rds(
+  "metricas-previsao-sessoes-sites/metricas_previsao_sarima_claudia.Rda") %>% 
+  dplyr::select(mape) %>% 
+  as.numeric() %>% 
+  round(digits = 3)*100
+
+metrica_ensemble_claudia <- readr::read_rds("previsao-modelos-ensemble/modelo_ensemble_claudia.Rda") %>% 
+  dplyr::distinct(MAPE_ensemble) %>% 
+  round(digits = 3)*100
+
+################################################################################
+
+df_forecast_full <- readr::read_rds("tabela_previsao_consolidada/tbl_previsao_consolidada_claudia.Rda")
+df_forecast_full <- df_forecast_full %>%
+  tibble::as_tibble()
+
+
+df_forecast_plot <- df_forecast_full %>%
+  dplyr::filter(!is.na(ETS)) %>%
+  tidyr::pivot_longer(
+    cols = c(ATUAL, ETS, SARIMA, PROPHET, ENSEMBLE),
+    names_to = "serie",
+    values_to = "valor"
+  ) %>%
+  dplyr::filter(!is.na(valor)) %>%
+  dplyr::rename(x = `.index`, y = valor) %>%
+  dplyr::mutate(
+    x_tooltip = x %>% format("%d %b %y"),
+    y_tooltip = y %>% round(0) %>% format(nsmall = 0, big.mark = " "),
+    x = highcharter::datetime_to_timestamp(x)
+  )
+
+
+
+highcharter::highchart() %>%
+  highcharter::hc_add_series(
+    data = df_forecast_plot,
+    # name = "Basal",
+    type = "line",
+    color = c(
+      highcharter::hex_to_rgba(x = "#5bae93", 1),
+      highcharter::hex_to_rgba(x = "#FF9996", 1),
+      highcharter::hex_to_rgba(x = "#FF9996", 1),
+      highcharter::hex_to_rgba(x = "#FF9996", 1),
+      highcharter::hex_to_rgba(x = "#FF9996", 1)
+    ),
+    highcharter::hcaes(x = x, y = y, group = serie),
+    marker = list(symbol = "circle", radius = 3),
+    tooltip = list(
+      headerFormat = "",
+      pointFormat  = "{point.x_tooltip}<br><b>{point.y_tooltip}</b>"
+    )
+  ) %>%
+  highcharter::hc_xAxis(
+    type     = "datetime",
+    crosshair = TRUE
+  )
+```
+
