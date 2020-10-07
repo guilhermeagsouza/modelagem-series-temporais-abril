@@ -2,6 +2,7 @@ library(modeltime)
 library(readxl)
 library(tidyverse)
 library(timetk)
+library(tidymodels)
 
 df_consolidados <- readxl::read_xlsx(
   "dados_site/sites_consolidados_2015.01.01_2020.09.19.xlsx")
@@ -44,13 +45,13 @@ splits
 # ETS
 model_fit_ets <- modeltime::exp_smoothing() %>%
   parsnip::set_engine(engine = "ets") %>%
-  parsnip::fit(value ~ date, data = training(splits))
+  parsnip::fit(value ~ date, data = rsample::training(splits))
 
 
 # PROPHET
 model_fit_prophet <- prophet_reg() %>%
-  set_engine(engine = "prophet", weekly.seasonality=TRUE) %>%
-  fit(value ~ date, data = training(splits))
+  parsnip::set_engine(engine = "prophet", weekly.seasonality=TRUE) %>%
+  parsnip::fit(value ~ date, data = rsample::training(splits))
 
 models_tbl <- modeltime_table(
   model_fit_ets,
@@ -58,26 +59,39 @@ models_tbl <- modeltime_table(
 )
 models_tbl
 
+
 # Avaliando nos dados de teste
 calibration_tbl <- models_tbl %>%
-  modeltime_calibrate(new_data = testing(splits))
+  modeltime_calibrate(new_data = rsample::testing(splits))
 calibration_tbl
 
+dados_modelo_teste <- 
+plyr::ldply(calibration_tbl$.calibration_data, fun = data.frame) %>% 
+  dplyr::mutate(modelo = c(rep(calibration_tbl[1,3]$.model_desc, n_teste),
+                          rep(calibration_tbl[2,3]$.model_desc, n_teste))
+  ) %>% 
+  tidyr::pivot_wider(names_from = modelo, values_from = c(.actual, .prediction))
 
+colnames(dados_modelo_teste) <- c("date", "residuals", "Real_ETS","Real_PROPHET",
+                                  "Previsao_ETS","Previsao_PROPHET")
+
+dados_modelo_teste %>% 
+  data.frame() %>% 
+  readr::write_rds("dados-modelo-teste/boaforma.Rda")
 
 #GRÁFICO
 calibration_tbl %>%
-  modeltime_forecast(
-    new_data    = testing(splits),
+  modeltime::modeltime_forecast(
+    new_data    = rsample::testing(splits),
     actual_data = serie_boaforma
   ) %>%
-  plot_modeltime_forecast(
+  modeltime::plot_modeltime_forecast(
     .legend_max_width = 25
   )
 
 # Métricas
 metricas_boaforma <- calibration_tbl %>%
-  modeltime_accuracy()
+  modeltime::modeltime_accuracy()
 metricas_boaforma
 
 metricas_boaforma %>% 
@@ -87,7 +101,7 @@ metricas_boaforma %>%
 
 # PREVISAO PARA FORA DA AMOSTRA
 refit_tbl <- calibration_tbl %>%
-  modeltime_refit(data = serie_boaforma)
+  modeltime::modeltime_refit(data = serie_boaforma)
 
 tbl_previsao <- refit_tbl %>%
   modeltime::modeltime_forecast(h = 30, actual_data = serie_boaforma)
@@ -105,11 +119,13 @@ tbl_previsao %>%
                    by = c(".index")
   ) %>% 
   tidyr::pivot_wider(names_from = c(.model_desc), values_from = c(.value)) %>% 
-  dplyr::mutate(site = "Boa Forma") %>% 
+  dplyr::mutate(site = "Boa Forma",
+                isoYearIsoWeek= 100* lubridate::year(.index) + lubridate::isoweek(.index)) %>% 
   readr::write_rds("previsao-sessoes-sites/tbl_previsao_boaforma.Rda")
 
 rm(list=setdiff(ls(), 
-                c("df_consolidados", "data_iniciosemana_anosemana","by_site"))
+                c("df_consolidados", "data_iniciosemana_anosemana","by_site",
+                  "dados_modelo_teste"))
 )
 ################################################################################
 # 2. SITE CAPRICHO
@@ -148,6 +164,21 @@ calibration_tbl <- models_tbl %>%
   modeltime_calibrate(new_data = testing(splits))
 calibration_tbl
 
+#########
+dados_modelo_teste <- 
+  plyr::ldply(calibration_tbl$.calibration_data, fun = data.frame) %>% 
+  dplyr::mutate(modelo = c(rep(calibration_tbl[1,3]$.model_desc, n_teste),
+                           rep(calibration_tbl[2,3]$.model_desc, n_teste))
+  ) %>% 
+  tidyr::pivot_wider(names_from = modelo, values_from = c(.actual, .prediction))
+
+colnames(dados_modelo_teste) <- c("date", "residuals", "Real_ETS","Real_PROPHET",
+                                  "Previsao_ETS","Previsao_PROPHET")
+
+dados_modelo_teste %>% 
+  data.frame() %>% 
+  readr::write_rds("dados-modelo-teste/capricho.Rda")
+##########
 
 
 #GRÁFICO
@@ -189,11 +220,13 @@ tbl_previsao %>%
                    by = c(".index")
   ) %>% 
   tidyr::pivot_wider(names_from = c(.model_desc), values_from = c(.value)) %>% 
-  dplyr::mutate(site = "Capricho") %>% 
+  dplyr::mutate(site = "Capricho",
+                isoYearIsoWeek= 100*lubridate::year(.index) + lubridate::isoweek(.index)) %>% 
   readr::write_rds("previsao-sessoes-sites/tbl_previsao_capricho.Rda")
 
 rm(list=setdiff(ls(), 
-                c("df_consolidados", "data_iniciosemana_anosemana","by_site"))
+                c("df_consolidados", "data_iniciosemana_anosemana","by_site",
+                  "dados_modelo_teste"))
 )
 
 ################################################################################
@@ -233,7 +266,21 @@ calibration_tbl <- models_tbl %>%
   modeltime_calibrate(new_data = testing(splits))
 calibration_tbl
 
+################
+dados_modelo_teste <- 
+  plyr::ldply(calibration_tbl$.calibration_data, fun = data.frame) %>% 
+  dplyr::mutate(modelo = c(rep(calibration_tbl[1,3]$.model_desc, n_teste),
+                           rep(calibration_tbl[2,3]$.model_desc, n_teste))
+  ) %>% 
+  tidyr::pivot_wider(names_from = modelo, values_from = c(.actual, .prediction))
 
+colnames(dados_modelo_teste) <- c("date", "residuals", "Real_ETS","Real_PROPHET",
+                                  "Previsao_ETS","Previsao_PROPHET")
+
+dados_modelo_teste %>% 
+  data.frame() %>% 
+  readr::write_rds("dados-modelo-teste/guiadoestudante.Rda")
+##################
 
 #GRÁFICO
 calibration_tbl %>%
@@ -274,11 +321,13 @@ tbl_previsao %>%
                    by = c(".index")
   ) %>% 
   tidyr::pivot_wider(names_from = c(.model_desc), values_from = c(.value)) %>% 
-  dplyr::mutate(site = "Guia do Estudante") %>% 
+  dplyr::mutate(site = "Guia do Estudante",
+                isoYearIsoWeek= 100* lubridate::year(.index) + lubridate::isoweek(.index)) %>% 
   readr::write_rds("previsao-sessoes-sites/tbl_previsao_guiadoestudante.Rda")
 
 rm(list=setdiff(ls(), 
-                c("df_consolidados", "data_iniciosemana_anosemana","by_site"))
+                c("df_consolidados", "data_iniciosemana_anosemana","by_site",
+                  "dados_modelo_teste"))
 )
 
 ################################################################################
@@ -318,7 +367,21 @@ calibration_tbl <- models_tbl %>%
   modeltime_calibrate(new_data = testing(splits))
 calibration_tbl
 
+################
+dados_modelo_teste <- 
+  plyr::ldply(calibration_tbl$.calibration_data, fun = data.frame) %>% 
+  dplyr::mutate(modelo = c(rep(calibration_tbl[1,3]$.model_desc, n_teste),
+                           rep(calibration_tbl[2,3]$.model_desc, n_teste))
+  ) %>% 
+  tidyr::pivot_wider(names_from = modelo, values_from = c(.actual, .prediction))
 
+colnames(dados_modelo_teste) <- c("date", "residuals", "Real_ETS","Real_PROPHET",
+                                  "Previsao_ETS","Previsao_PROPHET")
+
+dados_modelo_teste %>% 
+  data.frame() %>% 
+  readr::write_rds("dados-modelo-teste/quatrorodas.Rda")
+################
 
 #GRÁFICO
 calibration_tbl %>%
@@ -359,11 +422,13 @@ tbl_previsao %>%
                    by = c(".index")
   ) %>% 
   tidyr::pivot_wider(names_from = c(.model_desc), values_from = c(.value)) %>% 
-  dplyr::mutate(site = "Quatro Rodas") %>% 
+  dplyr::mutate(site = "Quatro Rodas",
+                isoYearIsoWeek= 100* lubridate::year(.index) + lubridate::isoweek(.index)) %>% 
   readr::write_rds("previsao-sessoes-sites/tbl_previsao_quatrorodas.Rda")
 
 rm(list=setdiff(ls(), 
-                c("df_consolidados", "data_iniciosemana_anosemana","by_site"))
+                c("df_consolidados", "data_iniciosemana_anosemana","by_site",
+                  "dados_modelo_teste"))
 )
 
 ################################################################################
@@ -403,7 +468,21 @@ calibration_tbl <- models_tbl %>%
   modeltime_calibrate(new_data = testing(splits))
 calibration_tbl
 
+################
+dados_modelo_teste <- 
+  plyr::ldply(calibration_tbl$.calibration_data, fun = data.frame) %>% 
+  dplyr::mutate(modelo = c(rep(calibration_tbl[1,3]$.model_desc, n_teste),
+                           rep(calibration_tbl[2,3]$.model_desc, n_teste))
+  ) %>% 
+  tidyr::pivot_wider(names_from = modelo, values_from = c(.actual, .prediction))
 
+colnames(dados_modelo_teste) <- c("date", "residuals", "Real_ETS","Real_PROPHET",
+                                  "Previsao_ETS","Previsao_PROPHET")
+
+dados_modelo_teste %>% 
+  data.frame() %>% 
+  readr::write_rds("dados-modelo-teste/saude.Rda")
+################
 
 #GRÁFICO
 calibration_tbl %>%
@@ -444,11 +523,13 @@ tbl_previsao %>%
                    by = c(".index")
   ) %>% 
   tidyr::pivot_wider(names_from = c(.model_desc), values_from = c(.value)) %>% 
-  dplyr::mutate(site = "Saúde") %>% 
+  dplyr::mutate(site = "Saúde",
+                isoYearIsoWeek= 100* lubridate::year(.index) + lubridate::isoweek(.index)) %>% 
   readr::write_rds("previsao-sessoes-sites/tbl_previsao_saude.Rda")
 
 rm(list=setdiff(ls(), 
-                c("df_consolidados", "data_iniciosemana_anosemana","by_site"))
+                c("df_consolidados", "data_iniciosemana_anosemana","by_site",
+                  "dados_modelo_teste"))
 )
 
 ################################################################################
@@ -488,7 +569,21 @@ calibration_tbl <- models_tbl %>%
   modeltime_calibrate(new_data = testing(splits))
 calibration_tbl
 
+################
+dados_modelo_teste <- 
+  plyr::ldply(calibration_tbl$.calibration_data, fun = data.frame) %>% 
+  dplyr::mutate(modelo = c(rep(calibration_tbl[1,3]$.model_desc, n_teste),
+                           rep(calibration_tbl[2,3]$.model_desc, n_teste))
+  ) %>% 
+  tidyr::pivot_wider(names_from = modelo, values_from = c(.actual, .prediction))
 
+colnames(dados_modelo_teste) <- c("date", "residuals", "Real_ETS","Real_PROPHET",
+                                  "Previsao_ETS","Previsao_PROPHET")
+
+dados_modelo_teste %>% 
+  data.frame() %>% 
+  readr::write_rds("dados-modelo-teste/superinteressante.Rda")
+################
 
 #GRÁFICO
 calibration_tbl %>%
@@ -529,11 +624,13 @@ tbl_previsao %>%
                    by = c(".index")
   ) %>% 
   tidyr::pivot_wider(names_from = c(.model_desc), values_from = c(.value)) %>% 
-  dplyr::mutate(site = "Superinteressante") %>% 
+  dplyr::mutate(site = "Superinteressante",
+                isoYearIsoWeek= 100* lubridate::year(.index) + lubridate::isoweek(.index)) %>% 
   readr::write_rds("previsao-sessoes-sites/tbl_previsao_superinteressante.Rda")
 
 rm(list=setdiff(ls(), 
-                c("df_consolidados", "data_iniciosemana_anosemana","by_site"))
+                c("df_consolidados", "data_iniciosemana_anosemana","by_site",
+                  "dados_modelo_teste"))
 )
 
 ################################################################################
@@ -572,7 +669,21 @@ calibration_tbl <- models_tbl %>%
   modeltime_calibrate(new_data = testing(splits))
 calibration_tbl
 
+################
+dados_modelo_teste <- 
+  plyr::ldply(calibration_tbl$.calibration_data, fun = data.frame) %>% 
+  dplyr::mutate(modelo = c(rep(calibration_tbl[1,3]$.model_desc, n_teste),
+                           rep(calibration_tbl[2,3]$.model_desc, n_teste))
+  ) %>% 
+  tidyr::pivot_wider(names_from = modelo, values_from = c(.actual, .prediction))
 
+colnames(dados_modelo_teste) <- c("date", "residuals", "Real_ETS","Real_PROPHET",
+                                  "Previsao_ETS","Previsao_PROPHET")
+
+dados_modelo_teste %>% 
+  data.frame() %>% 
+  readr::write_rds("dados-modelo-teste/veja.Rda")
+################
 
 #GRÁFICO
 calibration_tbl %>%
@@ -613,11 +724,13 @@ tbl_previsao %>%
                    by = c(".index")
   ) %>% 
   tidyr::pivot_wider(names_from = c(.model_desc), values_from = c(.value)) %>% 
-  dplyr::mutate(site = "Veja") %>% 
+  dplyr::mutate(site = "Veja",
+                isoYearIsoWeek= 100* lubridate::year(.index) + lubridate::isoweek(.index)) %>% 
   readr::write_rds("previsao-sessoes-sites/tbl_previsao_veja.Rda")
 
 rm(list=setdiff(ls(), 
-                c("df_consolidados", "data_iniciosemana_anosemana","by_site"))
+                c("df_consolidados", "data_iniciosemana_anosemana","by_site",
+                  "dados_modelo_teste"))
 )
 
 ################################################################################
@@ -656,7 +769,21 @@ calibration_tbl <- models_tbl %>%
   modeltime_calibrate(new_data = testing(splits))
 calibration_tbl
 
+################
+dados_modelo_teste <- 
+  plyr::ldply(calibration_tbl$.calibration_data, fun = data.frame) %>% 
+  dplyr::mutate(modelo = c(rep(calibration_tbl[1,3]$.model_desc, n_teste),
+                           rep(calibration_tbl[2,3]$.model_desc, n_teste))
+  ) %>% 
+  tidyr::pivot_wider(names_from = modelo, values_from = c(.actual, .prediction))
 
+colnames(dados_modelo_teste) <- c("date", "residuals", "Real_ETS","Real_PROPHET",
+                                  "Previsao_ETS","Previsao_PROPHET")
+
+dados_modelo_teste %>% 
+  data.frame() %>% 
+  readr::write_rds("dados-modelo-teste/claudia.Rda")
+################
 
 #GRÁFICO
 calibration_tbl %>%
@@ -697,10 +824,12 @@ tbl_previsao %>%
                    by = c(".index")
   ) %>% 
   tidyr::pivot_wider(names_from = c(.model_desc), values_from = c(.value)) %>% 
-  dplyr::mutate(site = "Claudia") %>% 
+  dplyr::mutate(site = "Claudia",
+                isoYearIsoWeek= 100* lubridate::year(.index) + lubridate::isoweek(.index)) %>% 
   readr::write_rds("previsao-sessoes-sites/tbl_previsao_claudia.Rda")
 
 rm(list=setdiff(ls(), 
-                c("df_consolidados", "data_iniciosemana_anosemana","by_site"))
+                c("df_consolidados", "data_iniciosemana_anosemana","by_site",
+                  "dados_modelo_teste"))
 )
 

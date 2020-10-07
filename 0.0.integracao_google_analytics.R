@@ -1,10 +1,11 @@
 sites_ids <- data.frame(site = c("Boa Forma", "Capricho", "Guia do Estudante",
                                  "Quatro Rodas", "Saúde", "Superinteressante",
-                                 "Veja", "Claudia", "Você.SA"),
+                                 "Veja", "Claudia com parceiros",
+                                 "Claudia sem parceiro", "Você.SA"),
                         
                         id = c("128974046", "22763039", "24051908", 
                                "45238368", "128969945", "24051965",
-                               "37837306", "59042287", "209350856")
+                               "37837306", "59042287", "59042287","209350856")
 )
 
 #Não vale a pena nem criar um FOR, uma vez que as requisições são canceladas
@@ -45,7 +46,7 @@ query.list <- Init(start.date = "2015-01-02",
                    metrics = "ga:sessions,ga:users, ga:pageviews, ga:sessionDuration",
                    max.results = 10000,
                    sort = "-ga:isoYearIsoWeek",
-                   table.id = "ga:209350856")
+                   table.id = "ga:59042287")
 
 # Create the Query Builder object so that the query parameters are validated
 ga.query <- QueryBuilder(query.list)

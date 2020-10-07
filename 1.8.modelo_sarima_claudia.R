@@ -84,6 +84,10 @@ require(normtest)
 normtest::jb.norm.test(fit.air$residuals, nrepl = 2000) #***
 
 previsao <- forecast::forecast(object = fit.air, h = 30, level = 0.95)
+#CRIADO 05.10.2020
+#ESCREVER OS VALORES AJUSTADOS DO SARIMA
+data.frame(previsao_sarima = previsao$mean %>% as.numeric()) %>% 
+  readr::write_rds("previsao-ajustados-sarima/claudia.Rda")
 
 previsao_claudia <- previsao %>% 
   data.frame() %>% 
@@ -126,6 +130,11 @@ data_previsao <- readr::read_rds("previsao-sessoes-sites/tbl_previsao_claudia.Rd
 previsao_sarima <- previsao_foradaamostra %>% 
   data.frame() %>% 
   dplyr::select(Point.Forecast)
+
+data.frame(.index = data_previsao, 
+           SARIMA = previsao_sarima$Point.Forecast) %>% 
+  dplyr::mutate(isoYearIsoWeek= 100* lubridate::year(.index) + lubridate::isoweek(.index)) %>% 
+  readr::write_rds("previsao-sessoes-sites/tbl_sarima_claudia.Rda")
 
 #Salvando a base de previsão atualizada com os modelos ETS, Prophet e SARIMA.
 readr::read_rds("previsao-sessoes-sites/tbl_previsao_claudia.Rda") %>% 
