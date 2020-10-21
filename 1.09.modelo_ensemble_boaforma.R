@@ -36,68 +36,43 @@ fun_ensemble <- function(df_previsoes) {
   
 }
 ###############################################################################
-dados_modelo_teste <- readr::read_rds("dados-modelo-teste/boaforma.Rda")
 
-REAL <- dados_modelo_teste %>% 
-  dplyr::select(date, Real_ETS) %>% 
-  dplyr::rename(y_real = Real_ETS) %>% 
-  stats::na.omit()
+df_ajustados_STLF <- readr::read_rds("dados-ajustados-teste/previsao-treino-stlf-boaforma.Rda") %>% 
+  dplyr::rename(y_ajustado_modelo1 = PREVISAO_STLF)
 
-PREVISAO_ETS <- dados_modelo_teste %>% dplyr::select(date, Previsao_ETS) %>% 
-  stats::na.omit() %>% 
-  dplyr::rename(y_ajustado_modelo1 = Previsao_ETS)
+df_ajustados_SARIMA <- readr::read_rds("dados-ajustados-teste/previsao-treino-sarima-boaforma.Rda") %>% 
+  dplyr::rename(y_ajustado_modelo2 = PREVISAO_SARIMA)
 
-PREVISAO_PROPHET <- dados_modelo_teste %>% dplyr::select(date, Previsao_PROPHET) %>% 
-  stats::na.omit() %>% 
-  dplyr::rename(y_ajustado_modelo2 = Previsao_PROPHET)
+df_ajustados_PROPHET <- readr::read_rds("dados-ajustados-teste/previsao-treino-prophet-boaforma.Rda") %>% 
+  dplyr::rename(y_ajustado_modelo3 = PREVISAO_PROPHET)
 
-PREVISAO_SARIMA <- readr::read_rds("previsao-ajustados-sarima/boaforma.Rda") %>% 
-  rename(y_ajustado_modelo3 = previsao_sarima)
-
-df_previsoes <- REAL %>% 
-  dplyr::left_join(PREVISAO_ETS, by = c("date")) %>% 
-  dplyr::left_join(PREVISAO_PROPHET, by = c("date")) %>% 
-  cbind(PREVISAO_SARIMA)
-
-df_ensemble <- df_previsoes %>%
-  dplyr::select(-date) %>% 
+df_ensemble <- df_ajustados_STLF %>% 
+  dplyr::left_join(df_ajustados_SARIMA, by = c(".index","REAL")) %>% 
+  dplyr::left_join(df_ajustados_PROPHET, by = c(".index","REAL")) %>% 
+  dplyr::rename(y_real = REAL) %>% 
+  dplyr::select(-.index) %>% 
   fun_ensemble()
 
-#Selecionando apenas os pesos diferentes de 0
 pesos <- df_ensemble %>% 
-  dplyr::filter(peso1 !=0 & peso2 !=0 & peso3 !=0) %>% 
   slice(1)
 
-pesos
-
-pesos %>% write_rds("previsao-modelos-ensemble/pesos_ensemble_boaforma.Rda")
-
 ################################################################################
-previsao <- readr::read_rds("previsao-sessoes-sites/tbl_previsao_boaforma.Rda") %>% 
-  dplyr::filter(.key == "prediction")
-  
-modelo_ets <- previsao %>% select(.index, starts_with("ETS")) %>% 
-  stats::na.omit() %>% 
-  dplyr::distinct()
-colnames(modelo_ets) <- c(".index", "ETS")
 
-modelo_prophet <- previsao %>% select(.index, starts_with("PROPHET")) %>% 
-  stats::na.omit() %>% 
-  dplyr::distinct()
-modelo_sarima <- previsao %>% select(.index, starts_with("SARIMA")) %>% 
-  stats::na.omit() %>% 
-  dplyr::distinct()
+previsao_stlf <- readr::read_rds("previsao-modelos-stlf/previsao_boaforma.Rda")
+previsao_sarima <- readr::read_rds("previsao-modelos-sarima/previsao_boaforma.Rda")
+previsao_prophet <- readr::read_rds("previsao-modelos-prophet/previsao_boaforma.Rda")
 
-modelo_ensemble <- modelo_ets %>% 
-  dplyr::left_join(modelo_prophet, by = c(".index")) %>% 
-  dplyr::left_join(modelo_sarima, by = c(".index")) %>% 
+#Criando o ensemble
+modelo_ensemble <- previsao_stlf %>% 
+  dplyr::left_join(previsao_sarima, by = c(".index", "ano_semana")) %>% 
+  dplyr::left_join(previsao_prophet, by = c(".index","ano_semana")) %>% 
   dplyr::mutate(
-    modelo_ensemble = ETS*pesos$peso1 + 
-      PROPHET*pesos$peso2 + 
-      SARIMA*pesos$peso3,
-    MAPE_ensemble = pesos$mape,
-    isoYearIsoWeek = 100*lubridate::year(.index) + lubridate::isoweek(.index)
-  )
+    modelo_ensemble = PREVISAO_STLF*pesos$peso1 + PREVISAO_PROPHET*pesos$peso2 + PREVISAO_SARIMA*pesos$peso3,
+    MAPE_ensemble = pesos$mape
+  ) %>% 
+  dplyr::rename(isoYearIsoWeek = .index) %>% 
+  dplyr::select(-ano_semana)
+modelo_ensemble
 
 modelo_ensemble %>% 
   readr::write_rds("previsao-modelos-ensemble/modelo_ensemble_boaforma.Rda")

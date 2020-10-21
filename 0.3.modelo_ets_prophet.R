@@ -3,6 +3,7 @@ library(readxl)
 library(tidyverse)
 library(timetk)
 library(tidymodels)
+library(forecast)
 
 df_consolidados <- readxl::read_xlsx(
   "dados_site/sites_consolidados_2015.01.01_2020.09.19.xlsx")
@@ -36,10 +37,10 @@ serie_boaforma <- readr::read_rds("dados_p_graficos/base_boaforma.Rda") %>%
   dplyr::rename(date = x, value = y)
 
 #Dividindo em duas amostras
-n_teste <- 30
+n_teste <- 8
 
 splits <- rsample::initial_time_split(serie_boaforma, 
-                                      prop = round(1-n_teste/nrow(serie_boaforma),2))
+                                      prop = round(1-n_teste/nrow(serie_boaforma),3))
 splits
 
 # ETS
@@ -49,8 +50,9 @@ model_fit_ets <- modeltime::exp_smoothing() %>%
 
 
 # PROPHET
-model_fit_prophet <- prophet_reg() %>%
+model_fit_prophet <- modeltime::prophet_reg() %>%
   parsnip::set_engine(engine = "prophet", weekly.seasonality=TRUE) %>%
+  recipes::step_log(value) %>% 
   parsnip::fit(value ~ date, data = rsample::training(splits))
 
 models_tbl <- modeltime_table(
@@ -104,7 +106,7 @@ refit_tbl <- calibration_tbl %>%
   modeltime::modeltime_refit(data = serie_boaforma)
 
 tbl_previsao <- refit_tbl %>%
-  modeltime::modeltime_forecast(h = 30, actual_data = serie_boaforma)
+  modeltime::modeltime_forecast(h = n_teste, actual_data = serie_boaforma)
 
 tbl_previsao %>%
   modeltime::plot_modeltime_forecast(
@@ -135,11 +137,11 @@ serie_capricho <- readr::read_rds("dados_p_graficos/base_capricho.Rda") %>%
 
 #Dividindo em duas amostras
 
-n_teste <- 30
+n_teste <- 8/nrow(serie_capricho)
 
 splits <- rsample::initial_time_split(serie_capricho, 
                                       #Dividindo em 30 observações (automatizado)
-                                      prop = round(1-n_teste/nrow(serie_capricho),2))
+                                      prop = (1-n_teste))
 splits
 
 # ETS
@@ -194,6 +196,7 @@ calibration_tbl %>%
 # Métricas
 metricas_capricho <- calibration_tbl %>%
   modeltime_accuracy()
+metricas_capricho
 
 metricas_capricho %>% 
   readr::write_rds(
@@ -237,11 +240,11 @@ serie_guiadoestudante <- readr::read_rds("dados_p_graficos/base_guiadoestudante.
 
 #Dividindo em duas amostras
 
-n_teste <- 30
+n_teste <- 8/nrow(serie_guiadoestudante)
 
 splits <- rsample::initial_time_split(serie_guiadoestudante, 
                                       #Dividindo em 30 observações (automatizado)
-                                      prop = round(1-n_teste/nrow(serie_guiadoestudante),2))
+                                      prop = 1-n_teste)
 splits
 
 # ETS
@@ -295,6 +298,7 @@ calibration_tbl %>%
 # Métricas
 metricas_guiadoestudante <- calibration_tbl %>%
   modeltime_accuracy()
+metricas_guiadoestudante
 
 metricas_guiadoestudante %>% 
   readr::write_rds(
@@ -306,7 +310,7 @@ refit_tbl <- calibration_tbl %>%
   modeltime_refit(data = serie_guiadoestudante)
 
 tbl_previsao <- refit_tbl %>%
-  modeltime::modeltime_forecast(h = 30, actual_data = serie_guiadoestudante)
+  modeltime::modeltime_forecast(h = n_teste, actual_data = serie_guiadoestudante)
 
 tbl_previsao %>%
   modeltime::plot_modeltime_forecast(
@@ -338,11 +342,11 @@ serie_quatrorodas <- readr::read_rds("dados_p_graficos/base_quatrorodas.Rda") %>
 
 #Dividindo em duas amostras
 
-n_teste <- 30
+n_teste <- 8/nrow(serie_quatrorodas)
 
 splits <- rsample::initial_time_split(serie_quatrorodas, 
                                       #Dividindo em 30 observações (automatizado)
-                                      prop = round(1-n_teste/nrow(serie_quatrorodas),2))
+                                      prop = 1-n_teste)
 splits
 
 # ETS
@@ -396,6 +400,7 @@ calibration_tbl %>%
 # Métricas
 metricas_quatrorodas <- calibration_tbl %>%
   modeltime_accuracy()
+metricas_quatrorodas
 
 metricas_quatrorodas %>% 
   readr::write_rds(
@@ -407,7 +412,7 @@ refit_tbl <- calibration_tbl %>%
   modeltime_refit(data = serie_quatrorodas)
 
 tbl_previsao <- refit_tbl %>%
-  modeltime::modeltime_forecast(h = 30, actual_data = serie_quatrorodas)
+  modeltime::modeltime_forecast(h = n_teste, actual_data = serie_quatrorodas)
 
 tbl_previsao %>%
   modeltime::plot_modeltime_forecast(
@@ -439,11 +444,11 @@ serie_saude <- readr::read_rds("dados_p_graficos/base_saude.Rda") %>%
 
 #Dividindo em duas amostras
 
-n_teste <- 30
+n_teste <- 8/nrow(serie_saude)
 
 splits <- rsample::initial_time_split(serie_saude, 
                                       #Dividindo em 30 observações (automatizado)
-                                      prop = round(1-n_teste/nrow(serie_saude),2))
+                                      prop = 1-n_teste)
 splits
 
 # ETS
@@ -497,6 +502,7 @@ calibration_tbl %>%
 # Métricas
 metricas_saude <- calibration_tbl %>%
   modeltime_accuracy()
+metricas_saude
 
 metricas_saude %>% 
   readr::write_rds(
@@ -508,7 +514,7 @@ refit_tbl <- calibration_tbl %>%
   modeltime_refit(data = serie_saude)
 
 tbl_previsao <- refit_tbl %>%
-  modeltime::modeltime_forecast(h = 30, actual_data = serie_saude)
+  modeltime::modeltime_forecast(h = n_teste, actual_data = serie_saude)
 
 tbl_previsao %>%
   modeltime::plot_modeltime_forecast(
@@ -540,11 +546,11 @@ serie_superinteressante <- readr::read_rds("dados_p_graficos/base_superinteressa
 
 #Dividindo em duas amostras
 
-n_teste <- 30
+n_teste <- 8/nrow(serie_superinteressante)
 
 splits <- rsample::initial_time_split(serie_superinteressante, 
                                       #Dividindo em 30 observações (automatizado)
-                                      prop = round(1-n_teste/nrow(serie_superinteressante),2))
+                                      prop = 1-n_teste)
 splits
 
 # ETS
@@ -598,6 +604,7 @@ calibration_tbl %>%
 # Métricas
 metricas_superinteressante <- calibration_tbl %>%
   modeltime_accuracy()
+metricas_superinteressante
 
 metricas_superinteressante %>% 
   readr::write_rds(
@@ -609,7 +616,7 @@ refit_tbl <- calibration_tbl %>%
   modeltime_refit(data = serie_superinteressante)
 
 tbl_previsao <- refit_tbl %>%
-  modeltime::modeltime_forecast(h = 30, actual_data = serie_superinteressante)
+  modeltime::modeltime_forecast(h = n_teste, actual_data = serie_superinteressante)
 
 tbl_previsao %>%
   modeltime::plot_modeltime_forecast(
@@ -640,11 +647,11 @@ serie_veja <- readr::read_rds("dados_p_graficos/base_veja.Rda") %>%
   dplyr::rename(date = x, value = y)
 #Dividindo em duas amostras
 
-n_teste <- 30
+n_teste <- 8/nrow(serie_veja)
 
 splits <- rsample::initial_time_split(serie_veja, 
                                       #Dividindo em 30 observações (automatizado)
-                                      prop = round(1-n_teste/nrow(serie_veja),2))
+                                      prop = 1-n_teste)
 splits
 
 # ETS
@@ -698,6 +705,7 @@ calibration_tbl %>%
 # Métricas
 metricas_veja <- calibration_tbl %>%
   modeltime_accuracy()
+metricas_veja
 
 metricas_veja %>% 
   readr::write_rds(
@@ -709,7 +717,7 @@ refit_tbl <- calibration_tbl %>%
   modeltime_refit(data = serie_veja)
 
 tbl_previsao <- refit_tbl %>%
-  modeltime::modeltime_forecast(h = 30, actual_data = serie_veja)
+  modeltime::modeltime_forecast(h = n_teste, actual_data = serie_veja)
 
 tbl_previsao %>%
   modeltime::plot_modeltime_forecast(
@@ -740,11 +748,11 @@ serie_claudia <- readr::read_rds("dados_p_graficos/base_claudia.Rda") %>%
   dplyr::rename(date = x, value = y)
 #Dividindo em duas amostras
 
-n_teste <- 30
+n_teste <- 8/nrow(serie_claudia)
 
 splits <- rsample::initial_time_split(serie_claudia, 
                                       #Dividindo em 30 observações (automatizado)
-                                      prop = round(1-n_teste/nrow(serie_claudia),2))
+                                      prop = 1-n_teste)
 splits
 
 # ETS
@@ -752,10 +760,12 @@ model_fit_ets <- modeltime::exp_smoothing() %>%
   parsnip::set_engine(engine = "ets") %>%
   parsnip::fit(value ~ date, data = training(splits))
 
+#TIVE QUE TIRAR A COMPONENTE DE SAZONALIDADE SEMANAL na estimação do PROPHET
+#por apresentar previsões negativas
 
 # PROPHET
 model_fit_prophet <- prophet_reg() %>%
-  set_engine(engine = "prophet", weekly.seasonality=TRUE) %>%
+  set_engine(engine = "prophet", weekly.seasonality=FALSE) %>%
   fit(value ~ date, data = training(splits))
 
 models_tbl <- modeltime_table(
@@ -798,6 +808,7 @@ calibration_tbl %>%
 # Métricas
 metricas_claudia <- calibration_tbl %>%
   modeltime_accuracy()
+metricas_claudia
 
 metricas_claudia %>% 
   readr::write_rds(
@@ -809,7 +820,7 @@ refit_tbl <- calibration_tbl %>%
   modeltime_refit(data = serie_claudia)
 
 tbl_previsao <- refit_tbl %>%
-  modeltime::modeltime_forecast(h = 30, actual_data = serie_claudia)
+  modeltime::modeltime_forecast(h = n_teste, actual_data = serie_claudia)
 
 tbl_previsao %>%
   modeltime::plot_modeltime_forecast(
@@ -826,6 +837,8 @@ tbl_previsao %>%
   tidyr::pivot_wider(names_from = c(.model_desc), values_from = c(.value)) %>% 
   dplyr::mutate(site = "Claudia",
                 isoYearIsoWeek= 100* lubridate::year(.index) + lubridate::isoweek(.index)) %>% 
+  #PROVISÓRIO 07.10.2020
+  dplyr::mutate(`PROPHET`  = abs(`PROPHET`)) %>% 
   readr::write_rds("previsao-sessoes-sites/tbl_previsao_claudia.Rda")
 
 rm(list=setdiff(ls(), 

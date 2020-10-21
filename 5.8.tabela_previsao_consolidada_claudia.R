@@ -1,36 +1,24 @@
 #Dados com todos os modelos
-tbl_teste <- readr::read_rds("dados-modelo-teste/claudia.Rda")
+tbl_teste <- readr::read_rds("dados-modelo-teste/claudia.Rda") 
 
-#ETS teste
-ETS_teste <- tbl_teste %>% 
-  dplyr::select(date, Real_ETS, Previsao_ETS) %>% 
-  stats::na.omit() %>% 
-  dplyr::rename(.index = date, ATUAL = Real_ETS, ETS = Previsao_ETS)
+STLF_teste <- readr::read_rds("dados-ajustados-teste/previsao-treino-stlf-claudia.Rda") %>% 
+  dplyr::rename(ATUAL = REAL, STLF = PREVISAO_STLF)
 
-#PROPHET teste
-PROPHET_teste <- tbl_teste %>% 
-  dplyr::select(date, Real_PROPHET, Previsao_PROPHET) %>% 
-  stats::na.omit() %>% 
-  dplyr::rename(.index = date, ATUAL = Real_PROPHET, PROPHET = Previsao_PROPHET)
+SARIMA_teste <- readr::read_rds("dados-ajustados-teste/previsao-treino-sarima-claudia.Rda") %>% 
+  dplyr::rename(ATUAL = REAL, SARIMA = PREVISAO_SARIMA)
 
-#SARIMA teste
-SARIMA_teste <- readr::read_rds("previsao-ajustados-sarima/claudia.Rda") %>% 
-  #Junto uma coluna do ETS_teste ou do PROPHET_teste
-  cbind(
-    data.frame(.index = ETS_teste$.index, ATUAL = ETS_teste$ATUAL)
-  ) %>% 
-  dplyr::rename(SARIMA = previsao_sarima) %>% 
-  dplyr::select(.index, ATUAL, SARIMA)
+PROPHET_teste <- readr::read_rds("dados-ajustados-teste/previsao-treino-prophet-claudia.Rda") %>%
+  dplyr::rename(ATUAL = REAL, PROPHET = PREVISAO_PROPHET)
 
 #Carregando os pesos do modelo ENSEMBLE
 pesos <- readr::read_rds("previsao-modelos-ensemble/pesos_ensemble_claudia.Rda")
 
-tbl_teste <- ETS_teste %>% 
+tbl_teste <- STLF_teste %>% 
   left_join(PROPHET_teste, by = c(".index", "ATUAL")) %>% 
   left_join(SARIMA_teste, by = c(".index", "ATUAL")) %>% 
   dplyr::mutate(TIPO = "In_sample",
-                ENSEMBLE = pesos$peso1*ETS + pesos$peso2*PROPHET + pesos$peso3*SARIMA) %>% 
-  dplyr::select(.index, ATUAL, ETS, PROPHET, SARIMA, ENSEMBLE, TIPO)
+                ENSEMBLE = pesos$peso1*STLF + pesos$peso2*PROPHET + pesos$peso3*SARIMA) %>% 
+  dplyr::select(.index, ATUAL, STLF, PROPHET, SARIMA, ENSEMBLE, TIPO)
 
 ################################################################################
 tbl_previsao <- readr::read_rds("previsao-modelos-ensemble/modelo_ensemble_claudia.Rda") %>% 
@@ -39,12 +27,15 @@ tbl_previsao <- readr::read_rds("previsao-modelos-ensemble/modelo_ensemble_claud
     TIPO = 'Out_sample',
     ATUAL = as.numeric("NA")
   ) %>% 
-  dplyr::rename(ENSEMBLE = modelo_ensemble) %>% 
-  dplyr::select(.index, ATUAL, ETS, PROPHET, SARIMA,ENSEMBLE, TIPO)
+  dplyr::rename(ENSEMBLE = modelo_ensemble,
+                STLF = PREVISAO_STLF,
+                PROPHET = PREVISAO_PROPHET,
+                SARIMA = PREVISAO_SARIMA) %>% 
+  dplyr::select(.index, ATUAL, STLF, PROPHET, SARIMA,ENSEMBLE, TIPO)
 
 tbl_teste_previsao <- tbl_teste %>% 
   dplyr::full_join(tbl_previsao, 
-                   by = c(".index", "ATUAL", "ETS", "PROPHET", "SARIMA",
+                   by = c(".index", "ATUAL", "STLF", "PROPHET", "SARIMA",
                           "ENSEMBLE","TIPO")
   )
 
@@ -63,3 +54,4 @@ tbl_teste_previsao %>%
   readr::write_rds(
     "tabela_previsao_consolidada/tbl_previsao_consolidada_claudia.Rda")
 
+rm(list=ls())

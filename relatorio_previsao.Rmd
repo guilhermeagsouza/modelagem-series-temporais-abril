@@ -1206,8 +1206,6 @@ base_saude %>%
 
 #### 5.4 Gráfico com os resultados de previsão
 
-Considerou-se a métrica MAPE (erro absoluto percentual médio) como critério de avaliação dentro dos dados de validação.
-
 Por ordem, tivemos os seguintes *MAPEs*:
 
 * SARIMA - 21,5%
@@ -1291,8 +1289,6 @@ readr::read_rds("previsao-sessoes-sites/tbl_previsao_saude.Rda") %>%
 ### 6. Site Superinteressante
 
 #### 6.1 Gráfico da série temporal
-
-A série apresentou Houve um aumento da basal, dobrando de patamar.
 
 A série do site Superinteressante apresentou uma mudança brusca da basal em meados de julho de 2018, o que é explicado pela incorporação da Revista Mundo Estranho ao conteúdo do site. Além disso, há a presença de outliers concentrados no período de março a abril de 2020, motivado pela intensidade de matérias sobre tema COVID-19.
 
@@ -1540,7 +1536,7 @@ readr::read_rds("dados_p_graficos/base_veja.Rda") %>%
 
 #### 7.2 Gráfico da decomposição temporal
 
-Variação anual do total de sessões:
+*Variação anual do total de sessões:*
 
 * 2015-2016: +22,8%
 * 2016-2017: +17,5%
