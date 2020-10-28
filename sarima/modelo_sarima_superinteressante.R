@@ -32,7 +32,7 @@ ano_mes_dia_final
 
 source("funcoes_modelos/func_semanas_foradaamostra.R")
 weeks_foradamostra <- func_semanas_foradaamostra(
-  h_semanas = 8,
+  h_semanas = horizonte_previsao,
   data_inicial = ano_mes_dia_final
 )
 
@@ -145,7 +145,7 @@ ggplot2::autoplot(fit.air)
 forecast::checkresiduals(fit.air)
 
 #MAPE dentro da amostra
-accuracy(fit.air)
+forecast::accuracy(fit.air)
 
 #Gráfico de diagnóstico
 diag <- tsdiag(fit.air, gof.lag = 20)
@@ -223,7 +223,6 @@ fit.air2 <- forecast::Arima(
 
 fit.air2
 BETS::t_test(fit.air2)
-accuracy(fit.air2)
 
 
 

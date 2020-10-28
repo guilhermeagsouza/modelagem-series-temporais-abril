@@ -209,7 +209,6 @@ fit.air2 <- forecast::Arima(
 
 fit.air2
 BETS::t_test(fit.air2)
-accuracy(fit.air2)
 
 
 
