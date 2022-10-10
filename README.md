@@ -1,1 +1,3 @@
 ### Projeto de Previsão da série de sessões dos sites do Grupo Abril.
+
+**Descrição**: *Prever a audiência de cada marca (Veja, Superinteressante, Guia do Estudante, Quatro Rodas, Capricho, Boaforma, Saúde e Cláudia) do Grupo Abril através da métrica de pageviews. Foram realizadas análises iniciais para monitoramento de possíveis quebras estruturais nas séries. Posteriormente quatro modelos foram propostos: ETS (modelo de suavização exponencial), Prophet (Facebook), SARIMA (com variáveis regressoras) e um Ensemble ponderado dos modelos. A consolidação dos resultados alimentava um banco de dados no Big Query (Google). A partir desses dados um dashboard apresentava os erros percentuais dos modelos.*
